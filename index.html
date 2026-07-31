@@ -398,6 +398,10 @@
 
         let bags = [];
         let pusherExtend = 0; // Visual animation for pneumatic pusher
+        
+        // Lift Physics Variables
+        let liftCycle = 0; 
+        const TRAY_SPACING = 2; // 6 trays in a 12m loop = 2m spacing
 
         // UI Updates
         function updateControls() {
@@ -605,6 +609,11 @@
             // Cap dt to prevent huge jumps if tab is inactive, apply multiplier
             const dt = Math.min(dtRaw, 0.1) * simSpeedMult; 
             
+            // Calculate Lift 6-Tray Cycle (0 to 2 meters)
+            let liftSpeedMS = C.B1.speed / 60;
+            liftCycle = (liftCycle + (liftSpeedMS * dt)) % TRAY_SPACING; 
+            let isTrayAligned = (liftCycle < 0.2 || liftCycle > 1.8); // Alignment tolerance
+
             if (batchRunning) {
                 simulatedTime += dt;
                 updateDashboard(); // Tick active timers
@@ -724,7 +733,15 @@
 
                 // Segment Transition
                 if (b.progress >= seg.length) {
-                    if (b.segment === 'A4') {
+                    if (b.segment === 'A1_A2') {
+                        // Physics: Wait for Lift Tray (6-Tray Sync Logic)
+                        b.progress = seg.length; // Stop and wait at the end of A2
+                        let isFront = !bags.some(nb => nb.segment === 'B1' && nb.progress < 1.0);
+                        if (isTrayAligned && isFront) {
+                            b.segment = 'B1';
+                            b.progress = 0;
+                        }
+                    } else if (b.segment === 'A4') {
                         // Sorter Logic
                         if (b.type === 'PM1') {
                             b.segment = 'A5';
@@ -939,6 +956,20 @@
             ctx.strokeStyle = '#38bdf8';
             ctx.lineWidth = 2;
             ctx.strokeRect(C.B1.visualStart.x - 20, C.B1.visualEnd.y - 10, 40, C.B1.visualStart.y - C.B1.visualEnd.y + 20);
+            
+            // Draw Moving Trays in Lift (6-Tray System)
+            ctx.fillStyle = 'rgba(56, 189, 248, 0.4)'; // Light blue trays
+            let liftVisualHeight = C.B1.visualStart.y - C.B1.visualEnd.y;
+            let pixelsPerMeter = liftVisualHeight / C.B1.length;
+            for(let i=0; i<=C.B1.length; i+=TRAY_SPACING) {
+                let yPosMeters = i - liftCycle;
+                if(yPosMeters < 0) yPosMeters += 12; // 12m total loop
+                if(yPosMeters <= C.B1.length) {
+                    let drawY = C.B1.visualStart.y - (yPosMeters * pixelsPerMeter);
+                    ctx.fillRect(C.B1.visualStart.x - 18, drawY - 4, 36, 8);
+                }
+            }
+
             ctx.fillStyle = '#38bdf8';
             ctx.fillText('LIFT UP 6M', C.B1.visualStart.x - 25, C.B1.visualStart.y + 20);
 
