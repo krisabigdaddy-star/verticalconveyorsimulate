@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conveyor SCADA System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #0f172a; /* Dark SCADA theme */
+            color: #e2e8f0;
+        }
+        canvas {
+            background-color: #1e293b;
+            border-radius: 0.5rem;
+            box-shadow: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+            width: 100%;
+            height: auto;
+        }
+        .scada-panel {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+        }
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px; width: 16px;
+            border-radius: 50%;
+            background: #38bdf8;
+            cursor: pointer;
+            margin-top: -6px;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 4px;
+            cursor: pointer;
+            background: #475569;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-6 min-h-screen flex flex-col">
+
+    <div class="w-full max-w-7xl mx-auto flex flex-col gap-6">
+        <div class="flex justify-between items-center border-b border-slate-700 pb-4">
+            <div>
+                <h1 class="text-2xl font-bold text-sky-400">🌐 SCADA: Material Handling Control</h1>
+                <p class="text-sm text-slate-400">System Code: LIFT UP 750-6000mm REV03 | Dual Line Sorting</p>
+            </div>
+            <div class="flex gap-6">
+                <!-- PM1 Stats -->
+                <div class="bg-slate-800 border border-blue-900/50 p-2 rounded-lg min-w-[160px]">
+                    <div class="flex justify-between items-center border-b border-blue-900 pb-1 mb-1">
+                        <span class="text-blue-400 font-bold text-sm">PM1 Status</span>
+                        <span id="statPm1State" class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">IDLE</span>
+                    </div>
+                    <div class="flex justify-between text-xs text-slate-300"><span>Infeed:</span> <span id="statPm1In" class="font-bold">0/0</span></div>
+                    <div class="flex justify-between text-xs text-slate-300"><span>Outfeed:</span> <span id="statPm1Out" class="font-bold text-emerald-400">0/0</span></div>
+                    <div class="flex justify-between text-xs text-slate-300 mt-1 pt-1 border-t border-slate-700">
+                        <span>⏱️ Time:</span> <span id="statPm1Time" class="font-mono text-sky-300">00:00</span>
+                    </div>
+                </div>
+                <!-- PM5 Stats -->
+                <div class="bg-slate-800 border border-orange-900/50 p-2 rounded-lg min-w-[160px]">
+                    <div class="flex justify-between items-center border-b border-orange-900 pb-1 mb-1">
+                        <span class="text-orange-400 font-bold text-sm">PM5 Status</span>
+                        <span id="statPm5State" class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">IDLE</span>
+                    </div>
+                    <div class="flex justify-between text-xs text-slate-300"><span>Infeed:</span> <span id="statPm5In" class="font-bold">0/0</span></div>
+                    <div class="flex justify-between text-xs text-slate-300"><span>Outfeed:</span> <span id="statPm5Out" class="font-bold text-emerald-400">0/0</span></div>
+                    <div class="flex justify-between text-xs text-slate-300 mt-1 pt-1 border-t border-slate-700">
+                        <span>⏱️ Time:</span> <span id="statPm5Time" class="font-mono text-sky-300">00:00</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            
+            <div class="lg:col-span-1 flex flex-col gap-4">
+                
+                <!-- Worker Control -->
+                <div class="scada-panel p-4 rounded-xl shadow-lg">
+                    <h3 class="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4 flex items-center"><span class="mr-2">👷</span> Infeed Worker Speed</h3>
+                    <div class="mb-2">
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-slate-400">Feed Rate (Bags/Min)</span>
+                            <span id="workerSpeedVal" class="font-bold text-sky-400">4</span>
+                        </div>
+                        <input type="range" id="workerSpeed" min="1" max="15" value="4" oninput="updateControls()">
+                    </div>
+                    
+                    <h3 class="text-sm font-semibold text-slate-300 uppercase tracking-wider mt-5 mb-3 flex items-center"><span class="mr-2">👷</span> Outfeed Worker (Unload)</h3>
+                    <div class="mb-3 space-y-3 border-b border-slate-700 pb-4">
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-blue-400">PM1 Unload Rate</span>
+                                <span id="pm1SpeedVal" class="font-bold text-blue-400">4</span>
+                            </div>
+                            <input type="range" id="pm1Speed" min="1" max="15" value="4" oninput="updateControls()">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-orange-400">PM5 Unload Rate</span>
+                                <span id="pm5SpeedVal" class="font-bold text-orange-400">4</span>
+                            </div>
+                            <input type="range" id="pm5Speed" min="1" max="15" value="4" oninput="updateControls()">
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-4 border-t border-slate-700">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="text-sm font-semibold text-emerald-400">🎯 Batch Queue Setup</h3>
+                            <button onclick="clearBatches()" class="text-xs text-rose-400 hover:text-rose-300 bg-rose-900/30 px-2 py-0.5 rounded border border-rose-800">ล้างคิว</button>
+                        </div>
+                        <div class="flex gap-2 mb-2">
+                            <div class="flex-1">
+                                <label class="text-[10px] text-blue-400 uppercase">PM1 (ถุง)</label>
+                                <input type="number" id="inputPm1Target" value="34" min="0" class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-sky-500">
+                            </div>
+                            <div class="flex-1">
+                                <label class="text-[10px] text-orange-400 uppercase">PM5 (ถุง)</label>
+                                <input type="number" id="inputPm5Target" value="0" min="0" class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-sky-500">
+                            </div>
+                            <div class="flex items-end">
+                                <button onclick="addBatch()" class="bg-sky-600 hover:bg-sky-500 text-white rounded px-3 py-1 h-[30px] text-sm shadow">+</button>
+                            </div>
+                        </div>
+                        
+                        <!-- เครื่องจักรและการจำลอง (Machine & Sim Setup) -->
+                        <div class="mt-3 bg-slate-800 p-2 rounded border border-slate-700">
+                            <h3 class="text-xs font-semibold text-slate-400 mb-2">⏱️ ตั้งค่าเวลาเครื่อง (นาที) และสปีดจำลอง</h3>
+                            <div class="grid grid-cols-2 gap-2 mb-2 text-xs">
+                                <div>
+                                    <label class="text-blue-400">PM1 Mix / Pack</label>
+                                    <div class="flex gap-1">
+                                        <input type="number" id="pm1Mix" value="6" min="1" class="w-full bg-slate-900 border border-slate-600 rounded px-1 py-1 text-white text-center">
+                                        <input type="number" id="pm1Pack" value="20" min="1" class="w-full bg-slate-900 border border-slate-600 rounded px-1 py-1 text-white text-center">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="text-orange-400">PM5 Mix / Pack</label>
+                                    <div class="flex gap-1">
+                                        <input type="number" id="pm5Mix" value="8" min="1" class="w-full bg-slate-900 border border-slate-600 rounded px-1 py-1 text-white text-center">
+                                        <input type="number" id="pm5Pack" value="20" min="1" class="w-full bg-slate-900 border border-slate-600 rounded px-1 py-1 text-white text-center">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 text-xs mt-3">
+                                <label class="text-slate-400">⚡ ความเร็ว Simulator:</label>
+                                <select id="simSpeedMult" class="flex-1 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white focus:outline-none focus:border-sky-500">
+                                    <option value="1">1x (เวลาจริง)</option>
+                                    <option value="5" selected>5x (เร็วขึ้น)</option>
+                                    <option value="20">20x (ข้ามเวลา)</option>
+                                    <option value="60">60x (เร็วสูงสุด)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Batch List -->
+                        <div id="batchList" class="bg-slate-900/50 rounded p-2 mt-3 mb-3 h-24 overflow-y-auto text-xs space-y-1 border border-slate-700">
+                        </div>
+
+                        <!-- Run Mode & Start Simulation -->
+                        <div class="mt-3">
+                            <div class="flex gap-4 mb-3 text-xs text-slate-300">
+                                <label class="flex items-center gap-1 cursor-pointer">
+                                    <input type="radio" name="runMode" value="sequential" checked class="text-sky-500 bg-slate-800 border-slate-600">
+                                    <span>ทีละ Batch (รอเคลียร์สายพาน)</span>
+                                </label>
+                                <label class="flex items-center gap-1 cursor-pointer">
+                                    <input type="radio" name="runMode" value="continuous" class="text-sky-500 bg-slate-800 border-slate-600">
+                                    <span>ต่อเนื่อง (ไม่ต้องรอ)</span>
+                                </label>
+                            </div>
+                            <button id="btnStart" onclick="startBatchSimulation()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-4 rounded shadow-lg mb-2 flex items-center justify-center gap-2">
+                                <span>▶️ START SIMULATION</span>
+                            </button>
+                        </div>
+
+                        <!-- Conveyor Speed Controls -->
+                        <div class="border-t border-slate-700 pt-4 mt-3">
+                            <h3 class="text-sm font-semibold text-slate-400 mb-3 flex items-center">⚙️ ความเร็วสายพาน (Conveyor Speed)</h3>
+                            
+                            <div class="mb-3">
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-slate-400">A1, A2 (Infeed)</span>
+                                    <span id="val_A1" class="font-bold text-slate-200">15 m/min</span>
+                                </div>
+                                <input type="range" id="speed_A1" min="5" max="30" value="15" oninput="updateControls()">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-slate-400">B1 (Lift 6m)</span>
+                                    <span id="val_B1" class="font-bold text-slate-200">20 m/min</span>
+                                </div>
+                                <input type="range" id="speed_B1" min="5" max="40" value="20" oninput="updateControls()">
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-blue-400">A3, A5 (PM1 Line)</span>
+                                    <span id="val_PM1" class="font-bold text-slate-200">20 m/min</span>
+                                </div>
+                                <input type="range" id="speed_PM1" min="5" max="40" value="20" oninput="updateControls()">
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-orange-400">A6, A7, A8 (PM5 Line)</span>
+                                    <span id="val_PM5" class="font-bold text-slate-200">20 m/min</span>
+                                </div>
+                                <input type="range" id="speed_PM5" min="5" max="40" value="20" oninput="updateControls()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-3 flex flex-col gap-4">
+                <div class="relative w-full rounded-xl overflow-hidden shadow-2xl border border-slate-700">
+                    <!-- SCADA Grid overlay -->
+                    <div class="absolute inset-0 pointer-events-none" style="background-image: radial-gradient(#334155 1px, transparent 1px); background-size: 20px 20px; opacity: 0.3;"></div>
+                    
+                    <canvas id="scadaCanvas" width="900" height="450"></canvas>
+                    
+                    <!-- Legend -->
+                    <div class="absolute bottom-4 left-4 bg-slate-900/80 p-3 rounded border border-slate-700 text-xs text-slate-300 flex flex-col gap-2">
+                        <div class="flex items-center"><div class="w-3 h-3 bg-blue-500 mr-2"></div> PM1 Target Bag</div>
+                        <div class="flex items-center"><div class="w-3 h-3 bg-orange-500 mr-2"></div> PM5 Target Bag</div>
+                        <div class="flex items-center"><div class="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981] mr-2"></div> Sensor Active</div>
+                    </div>
+                </div>
+
+                <!-- Event Logs & Batch Report -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 h-48">
+                    <!-- Logs -->
+                    <div class="scada-panel rounded-xl shadow-lg overflow-hidden flex flex-col h-full">
+                        <div class="bg-slate-800 px-4 py-2 border-b border-slate-700 text-xs font-semibold text-slate-400 uppercase">System Logs</div>
+                        <div id="logs" class="p-4 overflow-y-auto text-xs font-mono text-slate-300 space-y-1 flex-1">
+                            <div class="text-slate-500">System initialized. Awaiting commands...</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Report -->
+                    <div class="scada-panel rounded-xl shadow-lg overflow-hidden flex flex-col h-full">
+                        <div class="bg-slate-800 px-4 py-2 border-b border-slate-700 text-xs font-semibold text-sky-400 uppercase">📊 Batch Summary Report</div>
+                        <div id="reportBox" class="p-4 overflow-y-auto space-y-2 flex-1 bg-slate-900/50">
+                            <div id="emptyReportMsg" class="text-slate-500 text-center mt-8 text-xs">ยังไม่มีรายงานการผลิต<br>รอให้ Batch ทำงานเสร็จสมบูรณ์</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('scadaCanvas');
+        const ctx = canvas.getContext('2d');
+        const logBox = document.getElementById('logs');
+
+        // Physical Constants
+        let targetBagsPerMin = 4;
+        let pm1UnloadSpeed = 4;
+        let pm5UnloadSpeed = 4;
+        let lastPm1Unload = 0;
+        let lastPm5Unload = 0;
+        let nextWarnTime = 0;
+        let lastSpawnTime = 0;
+
+        // Batch Simulation Variables (UPDATED FOR MULTIPLE BATCHES)
+        let simulatedTime = 0; 
+        let batches = []; // Array to hold queue
+        let currentSpawnIdx = -1;
+        let simMode = 'sequential';
+        let batchRunning = false;
+
+        // Machine States
+        let machinePM1 = { state: 'IDLE', timer: 0, batchIdx: -1 };
+        let machinePM5 = { state: 'IDLE', timer: 0, batchIdx: -1 };
+
+        // UI Functions for Batch Queue
+        function addBatch() {
+            const p1 = parseInt(document.getElementById('inputPm1Target').value) || 0;
+            const p5 = parseInt(document.getElementById('inputPm5Target').value) || 0;
+            if(p1 === 0 && p5 === 0) return;
+
+            batches.push({
+                id: batches.length + 1,
+                pm1Target: p1, pm5Target: p5,
+                pm1Spawned: 0, pm5Spawned: 0,
+                pm1Out: 0, pm5Out: 0,
+                pm1Phase: p1 > 0 ? 'pending' : 'done', // pending, unloading, mixing, packing, done
+                pm5Phase: p5 > 0 ? 'pending' : 'done',
+                startTime: null, 
+                pm1UnloadStart: null, pm5UnloadStart: null, // Track when machine actually starts processing
+                endTime: null,
+                status: 'pending',
+                waitLogged: false
+            });
+            
+            // Reset input values to make it easier to type next
+            document.getElementById('inputPm1Target').value = 0;
+            document.getElementById('inputPm5Target').value = p1 > 0 ? p1 : 34; // just a smart swap guess
+
+            renderBatchList();
+        }
+
+        function clearBatches() {
+            if (batchRunning) {
+                alert("ไม่สามารถล้างคิวได้ขณะระบบกำลังทำงาน");
+                return;
+            }
+            batches = [];
+            renderBatchList();
+            document.getElementById('reportBox').innerHTML = '<div id="emptyReportMsg" class="text-slate-500 text-center mt-8 text-xs">ยังไม่มีรายงานการผลิต<br>รอให้ Batch ทำงานเสร็จสมบูรณ์</div>';
+            document.getElementById('logs').innerHTML = '<div class="text-slate-500">System initialized. Awaiting commands...</div>';
+        }
+
+        function renderBatchList() {
+            const listObj = document.getElementById('batchList');
+            if (batches.length === 0) {
+                listObj.innerHTML = '<div class="text-slate-500 text-center py-2" id="emptyQueueMsg">ยังไม่มีคิวการผลิต<br>ระบุตัวเลขและกด +</div>';
+                document.getElementById('btnStart').disabled = true;
+                return;
+            }
+            
+            document.getElementById('btnStart').disabled = batchRunning;
+            listObj.innerHTML = '';
+            
+            batches.forEach(b => {
+                let statusColor = 'text-slate-400';
+                let statusTxt = '⏳ รอคิว';
+                if(b.status === 'running') { statusColor = 'text-sky-400 font-bold'; statusTxt = '▶️ กำลังผลิต'; }
+                if(b.status === 'completed') { statusColor = 'text-emerald-400'; statusTxt = '✅ เสร็จสิ้น'; }
+
+                listObj.insertAdjacentHTML('beforeend', `
+                    <div class="flex justify-between items-center border-b border-slate-700/50 pb-1">
+                        <span class="font-bold text-slate-300">B#${b.id}</span>
+                        <div class="flex gap-2 text-[10px]">
+                            <span class="bg-blue-900/50 text-blue-300 px-1 rounded">PM1: ${b.pm1Target}</span>
+                            <span class="bg-orange-900/50 text-orange-300 px-1 rounded">PM5: ${b.pm5Target}</span>
+                        </div>
+                        <span class="${statusColor} w-16 text-right">${statusTxt}</span>
+                    </div>
+                `);
+            });
+        }
+
+        // Logging function
+        function addLog(msg, type='info') {
+            const time = new Date().toLocaleTimeString('th-TH');
+            const color = type === 'pm1' ? 'text-blue-400' : type === 'pm5' ? 'text-orange-400' : type === 'alert' ? 'text-rose-400' : 'text-slate-300';
+            logBox.insertAdjacentHTML('afterbegin', `<div class="${color}">[${time}] ${msg}</div>`);
+            if (logBox.children.length > 20) logBox.lastElementChild.remove();
+        }
+
+        // --- Conveyor Network Mapping ---
+        // We separate Physical Length (for math) from Visual coordinates (for drawing)
+        const C = {
+            A1_A2: { id: 'A1_A2', name: 'Infeed A1+A2', length: 15.0, speed: 15, visualStart: {x: 50, y: 350}, visualEnd: {x: 300, y: 350} },
+            B1:    { id: 'B1', name: 'Vertical Lift B1', length: 6.0, speed: 20, visualStart: {x: 300, y: 350}, visualEnd: {x: 300, y: 150} },
+            A3:    { id: 'A3', name: 'Outfeed A3', length: 2.3, speed: 20, visualStart: {x: 300, y: 150}, visualEnd: {x: 420, y: 150} },
+            A4:    { id: 'A4', name: 'Pusher Sorter A4', length: 0.5, speed: 20, visualStart: {x: 420, y: 150}, visualEnd: {x: 450, y: 150}, isSorter: true },
+            A5:    { id: 'A5', name: 'PM1 Line A5', length: 4.2, speed: 20, visualStart: {x: 450, y: 150}, visualEnd: {x: 650, y: 150} },
+            A6:    { id: 'A6', name: 'PM5 Branch A6', length: 3.2, speed: 20, visualStart: {x: 420, y: 150}, visualEnd: {x: 420, y: 250} },
+            A7:    { id: 'A7', name: 'Curve A7', length: 1.25, speed: 20, visualStart: {x: 420, y: 250}, visualEnd: {x: 470, y: 300} },
+            A8:    { id: 'A8', name: 'PM5 Line A8', length: 3.7, speed: 20, visualStart: {x: 470, y: 300}, visualEnd: {x: 650, y: 300} }
+        };
+
+        // Network Routing Rules
+        const Routing = {
+            'A1_A2': 'B1',
+            'B1': 'A3',
+            'A3': 'A4',
+            // A4 handles routing dynamically
+            'A5': 'DONE_PM1',
+            'A6': 'A7',
+            'A7': 'A8',
+            'A8': 'DONE_PM5'
+        };
+
+        const Sensors = {
+            S1: { x: 70, y: 350, state: 0, label: 'PE-1 (Check-in)' },
+            S2: { x: 280, y: 350, state: 0, label: 'PE-2 (Lift In)' },
+            S3: { x: 320, y: 150, state: 0, label: 'PE-3 (Lift Out)' },
+            S4: { x: 410, y: 150, state: 0, label: 'PE-4 (Sorter)' },
+            S5: { x: 630, y: 150, state: 0, label: 'PE-5 (PM1 Out)' },
+            S6: { x: 630, y: 300, state: 0, label: 'PE-6 (PM5 Out)' }
+        };
+
+        let bags = [];
+        let pusherExtend = 0; // Visual animation for pneumatic pusher
+
+        // UI Updates
+        function updateControls() {
+            targetBagsPerMin = parseInt(document.getElementById('workerSpeed').value);
+            document.getElementById('workerSpeedVal').innerText = targetBagsPerMin;
+            
+            pm1UnloadSpeed = parseInt(document.getElementById('pm1Speed').value);
+            document.getElementById('pm1SpeedVal').innerText = pm1UnloadSpeed;
+            
+            pm5UnloadSpeed = parseInt(document.getElementById('pm5Speed').value);
+            document.getElementById('pm5SpeedVal').innerText = pm5UnloadSpeed;
+            
+            C.A1_A2.speed = parseInt(document.getElementById('speed_A1').value);
+            document.getElementById('val_A1').innerText = C.A1_A2.speed + ' m/min';
+            
+            C.B1.speed = parseInt(document.getElementById('speed_B1').value);
+            document.getElementById('val_B1').innerText = C.B1.speed + ' m/min';
+            
+            const pm1Speed = parseInt(document.getElementById('speed_PM1').value);
+            C.A3.speed = pm1Speed; C.A4.speed = pm1Speed; C.A5.speed = pm1Speed;
+            document.getElementById('val_PM1').innerText = pm1Speed + ' m/min';
+            
+            const pm5Speed = parseInt(document.getElementById('speed_PM5').value);
+            C.A6.speed = pm5Speed; C.A7.speed = pm5Speed; C.A8.speed = pm5Speed;
+            document.getElementById('val_PM5').innerText = pm5Speed + ' m/min';
+        }
+
+        function formatTime(sec) {
+            if (sec < 0) sec = 0;
+            let m = Math.floor(sec / 60);
+            let s = Math.floor(sec % 60);
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function startBatchSimulation() {
+            if (batches.length === 0) return;
+            
+            // Read Run Mode
+            const radios = document.getElementsByName('runMode');
+            for(let r of radios) { if(r.checked) simMode = r.value; }
+
+            // Reset system
+            bags = [];
+            currentSpawnIdx = 0;
+            simulatedTime = 0;
+            lastSpawnTime = 0;
+            lastPm1Unload = 0;
+            lastPm5Unload = 0;
+            
+            batches.forEach(b => {
+                b.pm1Spawned = 0; b.pm5Spawned = 0;
+                b.pm1Out = 0; b.pm5Out = 0;
+                b.pm1Phase = b.pm1Target > 0 ? 'pending' : 'done';
+                b.pm5Phase = b.pm5Target > 0 ? 'pending' : 'done';
+                b.startTime = null; b.endTime = null;
+                b.status = 'pending';
+                b.waitLogged = false;
+            });
+            
+            machinePM1 = { state: 'IDLE', timer: 0, batchIdx: -1 };
+            machinePM5 = { state: 'IDLE', timer: 0, batchIdx: -1 };
+
+            window.infeedDoneLogged = false;
+            window.congestionLogged = 0;
+
+            batchRunning = true;
+            document.getElementById('btnStart').disabled = true;
+            document.getElementById('btnStart').classList.add('opacity-50');
+            
+            addLog(`🚀 START SYSTEM: [Mode: ${simMode.toUpperCase()}] Total ${batches.length} Batches.`, 'info');
+            renderBatchList();
+            updateDashboard();
+        }
+
+        function spawnBatchBag() {
+            if (currentSpawnIdx >= batches.length) return; // All batches spawned
+            
+            let currBatch = batches[currentSpawnIdx];
+
+            // Sequential Mode Check: Wait for previous batch to finish completely
+            if (simMode === 'sequential' && currentSpawnIdx > 0) {
+                let prevBatch = batches[currentSpawnIdx - 1];
+                if (prevBatch.status !== 'completed') {
+                    if (!prevBatch.waitLogged) {
+                        addLog(`⏳ Infeed หยุดชั่วคราว: โหมดทีละ Batch รอ Batch #${prevBatch.id} แพ็คเสร็จ`, 'info');
+                        prevBatch.waitLogged = true;
+                    }
+                    return; 
+                }
+            }
+
+            let available = [];
+            if (currBatch.pm1Spawned < currBatch.pm1Target) available.push('PM1');
+            if (currBatch.pm5Spawned < currBatch.pm5Target) available.push('PM5');
+
+            // If current batch is fully spawned, move pointer to next batch
+            if (available.length === 0) {
+                currentSpawnIdx++;
+                return; // Will try next batch on next tick
+            }
+
+            // Prevent spawning if infeed is congested
+            const congestion = bags.some(b => b.segment === 'A1_A2' && b.progress < 1.0);
+            if (congestion) {
+                if(simulatedTime > window.congestionLogged + 10) {
+                    addLog('⚠️ Infeed หยุดชั่วคราว: สายพานเต็ม (Accumulation) รอระบายของ', 'alert');
+                    window.congestionLogged = simulatedTime;
+                }
+                return;
+            }
+
+            // Mark batch as running and set start time
+            if (currBatch.status === 'pending') {
+                currBatch.status = 'running';
+                currBatch.startTime = simulatedTime;
+                renderBatchList();
+            }
+
+            // Pick randomly between available lines
+            const type = available[Math.floor(Math.random() * available.length)];
+            
+            if (type === 'PM1') currBatch.pm1Spawned++;
+            else currBatch.pm5Spawned++;
+
+            bags.push({
+                id: Math.random().toString(36).substr(2, 6).toUpperCase(),
+                batchIdx: currentSpawnIdx, // Tag bag with its batch ID
+                type: type,
+                segment: 'A1_A2',
+                progress: 0
+            });
+            
+            Sensors.S1.state = 1;
+            updateDashboard();
+        }
+
+        function updateDashboard() {
+            // Find the "active" batch to display on the top dashboard
+            // Prioritize the one currently being spawned, or the last one running
+            let dispBatch = null;
+            if (currentSpawnIdx >= 0 && currentSpawnIdx < batches.length) {
+                dispBatch = batches[currentSpawnIdx];
+            } else if (batches.length > 0) {
+                dispBatch = batches[batches.length - 1]; // Show last if all spawned
+            }
+
+            if (dispBatch) {
+                document.getElementById('statPm1In').innerText = `${dispBatch.pm1Spawned}/${dispBatch.pm1Target}`;
+                document.getElementById('statPm1Out').innerText = `${dispBatch.pm1Out}/${dispBatch.pm1Target}`;
+                document.getElementById('statPm5In').innerText = `${dispBatch.pm5Spawned}/${dispBatch.pm5Target}`;
+                document.getElementById('statPm5Out').innerText = `${dispBatch.pm5Out}/${dispBatch.pm5Target}`;
+
+                // Update Timers (Realtime for running batch)
+                if(dispBatch.startTime !== null && dispBatch.endTime === null) {
+                    document.getElementById('statPm1Time').innerText = formatTime(simulatedTime - dispBatch.startTime);
+                    document.getElementById('statPm5Time').innerText = formatTime(simulatedTime - dispBatch.startTime);
+                } else if (dispBatch.endTime !== null) {
+                    document.getElementById('statPm1Time').innerText = formatTime(dispBatch.endTime - dispBatch.startTime);
+                    document.getElementById('statPm5Time').innerText = formatTime(dispBatch.endTime - dispBatch.startTime);
+                }
+            } else {
+                document.getElementById('statPm1In').innerText = '0/0'; document.getElementById('statPm1Out').innerText = '0/0';
+                document.getElementById('statPm5In').innerText = '0/0'; document.getElementById('statPm5Out').innerText = '0/0';
+                document.getElementById('statPm1Time').innerText = '00:00'; document.getElementById('statPm5Time').innerText = '00:00';
+            }
+
+            // Update Machine States UI
+            function formatMachineTimer(sec) {
+                if(sec <= 0) return '';
+                let m = Math.floor(sec / 60); let s = Math.floor(sec % 60);
+                return ` (${m}:${s.toString().padStart(2, '0')})`;
+            }
+            
+            document.getElementById('statPm1State').innerText = machinePM1.state + formatMachineTimer(machinePM1.timer);
+            if(machinePM1.state === 'IDLE') document.getElementById('statPm1State').className = 'text-[10px] bg-slate-700 px-1 rounded text-slate-300';
+            else if(machinePM1.state === 'UNLOADING') document.getElementById('statPm1State').className = 'text-[10px] bg-blue-600 px-1 rounded text-white font-bold';
+            else document.getElementById('statPm1State').className = 'text-[10px] bg-amber-500 px-1 rounded text-slate-900 font-bold';
+
+            document.getElementById('statPm5State').innerText = machinePM5.state + formatMachineTimer(machinePM5.timer);
+            if(machinePM5.state === 'IDLE') document.getElementById('statPm5State').className = 'text-[10px] bg-slate-700 px-1 rounded text-slate-300';
+            else if(machinePM5.state === 'UNLOADING') document.getElementById('statPm5State').className = 'text-[10px] bg-orange-500 px-1 rounded text-white font-bold';
+            else document.getElementById('statPm5State').className = 'text-[10px] bg-amber-500 px-1 rounded text-slate-900 font-bold';
+
+            // Check Overall Completion
+            if (batchRunning) {
+                const allDone = batches.every(b => b.status === 'completed');
+                if (allDone && batches.length > 0) {
+                    batchRunning = false;
+                    addLog('🎉 ALL BATCHES IN QUEUE COMPLETED!', 'info');
+                    document.getElementById('btnStart').disabled = false;
+                    document.getElementById('btnStart').classList.remove('opacity-50');
+                }
+            }
+        }
+
+        let lastTime = performance.now();
+
+        function update(time) {
+            const dtRaw = (time - lastTime) / 1000; // Seconds elapsed real time
+            lastTime = time;
+            
+            // Get Sim Speed from UI
+            let simSpeedMult = parseFloat(document.getElementById('simSpeedMult').value) || 1;
+            
+            // Cap dt to prevent huge jumps if tab is inactive, apply multiplier
+            const dt = Math.min(dtRaw, 0.1) * simSpeedMult; 
+            
+            if (batchRunning) {
+                simulatedTime += dt;
+                updateDashboard(); // Tick active timers
+            }
+
+            // --- Machine State Logic (MIX & PACK) ---
+            if (batchRunning) {
+                // PM1 Machine Logic
+                if (machinePM1.state === 'MIXING') {
+                    machinePM1.timer -= dt;
+                    if (machinePM1.timer <= 0) {
+                        machinePM1.state = 'PACKING';
+                        machinePM1.timer = parseInt(document.getElementById('pm1Pack').value) * 60;
+                        batches[machinePM1.batchIdx].pm1Phase = 'packing';
+                        addLog(`📦 PM1 เริ่มกระบวนการแพ็ค Batch #${batches[machinePM1.batchIdx].id} (${document.getElementById('pm1Pack').value} นาที)`, 'pm1');
+                    }
+                } else if (machinePM1.state === 'PACKING') {
+                    machinePM1.timer -= dt;
+                    if (machinePM1.timer <= 0) {
+                        machinePM1.state = 'IDLE';
+                        batches[machinePM1.batchIdx].pm1Phase = 'done';
+                        addLog(`✅ PM1 จบงาน Batch #${batches[machinePM1.batchIdx].id} เครื่องพร้อมรับรอบใหม่`, 'pm1');
+                        checkBatchCompletion(batches[machinePM1.batchIdx]);
+                        machinePM1.batchIdx = -1;
+                    }
+                }
+
+                // PM5 Machine Logic
+                if (machinePM5.state === 'MIXING') {
+                    machinePM5.timer -= dt;
+                    if (machinePM5.timer <= 0) {
+                        machinePM5.state = 'PACKING';
+                        machinePM5.timer = parseInt(document.getElementById('pm5Pack').value) * 60;
+                        batches[machinePM5.batchIdx].pm5Phase = 'packing';
+                        addLog(`📦 PM5 เริ่มกระบวนการแพ็ค Batch #${batches[machinePM5.batchIdx].id} (${document.getElementById('pm5Pack').value} นาที)`, 'pm5');
+                    }
+                } else if (machinePM5.state === 'PACKING') {
+                    machinePM5.timer -= dt;
+                    if (machinePM5.timer <= 0) {
+                        machinePM5.state = 'IDLE';
+                        batches[machinePM5.batchIdx].pm5Phase = 'done';
+                        addLog(`✅ PM5 จบงาน Batch #${batches[machinePM5.batchIdx].id} เครื่องพร้อมรับรอบใหม่`, 'pm5');
+                        checkBatchCompletion(batches[machinePM5.batchIdx]);
+                        machinePM5.batchIdx = -1;
+                    }
+                }
+            }
+
+            // Auto Spawn Logic based on active batch
+            if (batchRunning) {
+                const spawnIntervalSec = 60 / targetBagsPerMin; // Simulated seconds per bag
+                if (simulatedTime - lastSpawnTime > spawnIntervalSec) {
+                    if (currentSpawnIdx >= batches.length) {
+                        if (!window.infeedDoneLogged) {
+                            addLog('✅ Infeed: พนักงานป้อนถุงครบทุกคิวแล้ว (ระบบหยุดรอคิวใหม่)', 'info');
+                            window.infeedDoneLogged = true;
+                        }
+                    } else {
+                        spawnBatchBag();
+                    }
+                    lastSpawnTime = simulatedTime;
+                }
+            }
+
+            // Decay sensors and pusher
+            for (let key in Sensors) {
+                if (Sensors[key].state > 0) Sensors[key].state -= dtRaw * 2;
+            }
+            if (pusherExtend > 0) pusherExtend -= dtRaw * 5;
+
+            // Move Bags
+            for (let i = bags.length - 1; i >= 0; i--) {
+                let b = bags[i];
+                let seg = C[b.segment];
+
+                // Calculate speed in m/s
+                let speedMS = seg.speed / 60; 
+                
+                // Interlock check (prevent bag overlap)
+                let canMove = true;
+                
+                // Very basic collision detection (distance based on same segment)
+                for (let j = 0; j < bags.length; j++) {
+                    if (i !== j && bags[j].segment === b.segment) {
+                        // If bag j is ahead of bag i, and within 0.8 meters
+                        if (bags[j].progress > b.progress && (bags[j].progress - b.progress) < 0.8) {
+                            canMove = false;
+                        }
+                    }
+                }
+
+                // Lookahead collision: Check if next segment is full
+                if (b.progress > seg.length - 0.8) {
+                    let nextSegName = null;
+                    if (b.segment === 'A4') {
+                        nextSegName = b.type === 'PM1' ? 'A5' : 'A6';
+                    } else {
+                        nextSegName = Routing[b.segment];
+                    }
+                    if (nextSegName && nextSegName !== 'DONE_PM1' && nextSegName !== 'DONE_PM5') {
+                        let blockedByNext = bags.some(nb => nb.segment === nextSegName && nb.progress < 0.8);
+                        if (blockedByNext) canMove = false;
+                    }
+                }
+
+                if (canMove) {
+                    b.progress += speedMS * dt;
+                }
+
+                // Sensor Triggers based on distance
+                if (b.segment === 'A1_A2' && b.progress > 14 && b.progress < 14.5) Sensors.S2.state = 1;
+                if (b.segment === 'A3' && b.progress > 0.1 && b.progress < 0.5) Sensors.S3.state = 1;
+                if (b.segment === 'A3' && b.progress > 2.0) Sensors.S4.state = 1;
+                // Full line sensors (stay green if bag is stuck there)
+                if (b.segment === 'A5' && b.progress > 3.4) Sensors.S5.state = 1; 
+                if (b.segment === 'A8' && b.progress > 2.9) Sensors.S6.state = 1;
+
+                // Segment Transition
+                if (b.progress >= seg.length) {
+                    if (b.segment === 'A4') {
+                        // Sorter Logic
+                        if (b.type === 'PM1') {
+                            b.segment = 'A5';
+                            b.progress = 0;
+                        } else {
+                            // Pusher pushes to A6
+                            b.segment = 'A6';
+                            b.progress = 0;
+                            pusherExtend = 1.0; // Trigger animation
+                            addLog(`Pneumatic Pusher active -> Sorted to PM5`, 'info');
+                        }
+                    } 
+                    else {
+                        const nextSeg = Routing[b.segment];
+                        if (nextSeg === 'DONE_PM1' || nextSeg === 'DONE_PM5') {
+                            // Bag stops and queues at the end of A5/A8
+                            b.progress = seg.length;
+                            b.isQueued = true;
+                        } else {
+                            b.segment = nextSeg;
+                            b.progress = b.progress - seg.length; // Carry over momentum
+                        }
+                    }
+                }
+            }
+
+            // --- Unload Logic (Worker Processing) ---
+            const pm1Interval = 60 / pm1UnloadSpeed;
+            if (machinePM1.state === 'IDLE' || machinePM1.state === 'UNLOADING') {
+                if (simulatedTime - lastPm1Unload > pm1Interval) {
+                    let ready = bags.filter(b => b.segment === 'A5' && b.isQueued);
+                    if (ready.length > 0) {
+                        let b = ready[0];
+                        let batch = batches[b.batchIdx];
+
+                        // Lock machine to this batch
+                        if (machinePM1.state === 'IDLE') {
+                            machinePM1.state = 'UNLOADING';
+                            machinePM1.batchIdx = b.batchIdx;
+                            batch.pm1Phase = 'unloading';
+                            if(batch.pm1UnloadStart === null) batch.pm1UnloadStart = simulatedTime; // Record process start time
+                        }
+
+                        // Only process unload if bag belongs to active batch in machine
+                        if (machinePM1.batchIdx === b.batchIdx) {
+                            bags = bags.filter(bag => bag.id !== b.id); 
+                            batch.pm1Out++;
+                            lastPm1Unload = simulatedTime;
+                            
+                            if (batch.pm1Out >= batch.pm1Target) {
+                                machinePM1.state = 'MIXING';
+                                machinePM1.timer = parseInt(document.getElementById('pm1Mix').value) * 60;
+                                batch.pm1Phase = 'mixing';
+                                addLog(`🔄 PM1 เทครบเป้าหมาย เริ่มผสม Batch #${batch.id} (${document.getElementById('pm1Mix').value} นาที)`, 'pm1');
+                            }
+                            updateDashboard();
+                        }
+                    }
+                }
+            }
+
+            const pm5Interval = 60 / pm5UnloadSpeed;
+            if (machinePM5.state === 'IDLE' || machinePM5.state === 'UNLOADING') {
+                if (simulatedTime - lastPm5Unload > pm5Interval) {
+                    let ready = bags.filter(b => b.segment === 'A8' && b.isQueued);
+                    if (ready.length > 0) {
+                        let b = ready[0];
+                        let batch = batches[b.batchIdx];
+
+                        // Lock machine to this batch
+                        if (machinePM5.state === 'IDLE') {
+                            machinePM5.state = 'UNLOADING';
+                            machinePM5.batchIdx = b.batchIdx;
+                            batch.pm5Phase = 'unloading';
+                            if(batch.pm5UnloadStart === null) batch.pm5UnloadStart = simulatedTime; // Record process start time
+                        }
+
+                        // Only process unload if bag belongs to active batch in machine
+                        if (machinePM5.batchIdx === b.batchIdx) {
+                            bags = bags.filter(bag => bag.id !== b.id);
+                            batch.pm5Out++;
+                            lastPm5Unload = simulatedTime;
+                            
+                            if (batch.pm5Out >= batch.pm5Target) {
+                                machinePM5.state = 'MIXING';
+                                machinePM5.timer = parseInt(document.getElementById('pm5Mix').value) * 60;
+                                batch.pm5Phase = 'mixing';
+                                addLog(`🔄 PM5 เทครบเป้าหมาย เริ่มผสม Batch #${batch.id} (${document.getElementById('pm5Mix').value} นาที)`, 'pm5');
+                            }
+                            updateDashboard();
+                        }
+                    }
+                }
+            }
+
+            // Queue Warning Alarms (throttled)
+            if (simulatedTime > nextWarnTime) {
+                let pm1Q = bags.filter(b => b.segment === 'A5').length;
+                let pm5Q = bags.filter(b => b.segment === 'A8').length;
+                if (pm1Q >= 5) addLog(`⚠️ PM1 Accumulation High! (${pm1Q} Bags)`, 'alert');
+                if (pm5Q >= 4) addLog(`⚠️ PM5 Accumulation High! (${pm5Q} Bags)`, 'alert');
+                if (pm1Q >= 5 || pm5Q >= 4) nextWarnTime = simulatedTime + 5; // Check again in 5s (simulated)
+            }
+        }
+
+        // Helper to check if a specific batch is done
+        function checkBatchCompletion(batch) {
+            if (batch.status !== 'completed' && batch.pm1Phase === 'done' && batch.pm5Phase === 'done') {
+                batch.endTime = simulatedTime;
+                batch.status = 'completed';
+                const totalTime = formatTime(batch.endTime - batch.startTime);
+                addLog(`🎯 BATCH #${batch.id} เสร็จสมบูรณ์! (ใช้เวลารวมตั้งแต่ Check-in ถึงแพ็คเสร็จ: ${totalTime})`, 'info');
+                renderBatchList();
+                addReportSummary(batch, totalTime);
+            }
+        }
+
+        // --- Report Generation Function ---
+        function addReportSummary(batch, totalTimeStr) {
+            const reportBox = document.getElementById('reportBox');
+            const emptyMsg = document.getElementById('emptyReportMsg');
+            if (emptyMsg) emptyMsg.remove();
+            
+            // Calculate Wait Time vs Process Time
+            let processStart = batch.pm1Target > 0 ? batch.pm1UnloadStart : batch.pm5UnloadStart;
+            if (batch.pm1Target > 0 && batch.pm5Target > 0) {
+                // If both lines used, take the earliest start time
+                processStart = Math.min(batch.pm1UnloadStart || Infinity, batch.pm5UnloadStart || Infinity);
+            }
+            
+            let waitTime = 0;
+            let processTime = 0;
+            if (processStart && processStart > batch.startTime) {
+                waitTime = processStart - batch.startTime;
+                processTime = batch.endTime - processStart;
+            } else {
+                processTime = batch.endTime - batch.startTime;
+            }
+
+            const pm1Str = batch.pm1Target > 0 ? `<span class="bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded">PM1: ${batch.pm1Target}</span>` : '';
+            const pm5Str = batch.pm5Target > 0 ? `<span class="bg-orange-900/50 text-orange-300 px-2 py-0.5 rounded">PM5: ${batch.pm5Target}</span>` : '';
+            
+            const html = `
+                <div class="bg-slate-800 p-3 rounded border border-slate-600 flex flex-col gap-2 text-xs shadow-lg">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <div class="font-bold text-sky-400 mb-1 text-sm">Batch #${batch.id}</div>
+                            <div class="flex gap-2">${pm1Str} ${pm5Str}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-[10px] text-slate-400 mb-1">เวลารวม (Lead Time)</div>
+                            <div class="font-mono font-bold text-white text-sm">⏱️ ${totalTimeStr}</div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 mt-1 pt-2 border-t border-slate-700 bg-slate-900/30 p-2 rounded">
+                        <div>
+                            <div class="text-[10px] text-slate-400">⏳ เวลารอคอยบนสายพาน</div>
+                            <div class="font-mono text-amber-400">${formatTime(waitTime)}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-[10px] text-slate-400">⚙️ เวลาเข้าเครื่องผลิตจริง</div>
+                            <div class="font-mono text-emerald-400">${formatTime(processTime)}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            reportBox.insertAdjacentHTML('afterbegin', html);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Conveyor Segments
+            for (let key in C) {
+                let seg = C[key];
+                
+                ctx.lineWidth = 14;
+                ctx.strokeStyle = '#475569'; // Track color
+                ctx.lineCap = 'round';
+                
+                ctx.beginPath();
+                ctx.moveTo(seg.visualStart.x, seg.visualStart.y);
+                
+                // If it's the curve A7, draw a curve
+                if (key === 'A7') {
+                    // Quadratic curve for 90 deg turn
+                    ctx.quadraticCurveTo(seg.visualStart.x, seg.visualEnd.y, seg.visualEnd.x, seg.visualEnd.y);
+                } else {
+                    ctx.lineTo(seg.visualEnd.x, seg.visualEnd.y);
+                }
+                ctx.stroke();
+
+                // Draw moving belt effect
+                ctx.lineWidth = 8;
+                ctx.strokeStyle = '#64748b';
+                ctx.setLineDash([10, 10]);
+                // Animate dash offset based on time and speed
+                let dashOffset = -(performance.now() / 50) * (seg.speed / 20); 
+                ctx.lineDashOffset = dashOffset;
+                ctx.stroke();
+                ctx.setLineDash([]); // Reset
+                
+                // Labels
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '10px Arial';
+                ctx.fillText(seg.name, seg.visualStart.x + 10, seg.visualStart.y - 15);
+            }
+
+            // Draw Lift Mechanism (B1)
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(C.B1.visualStart.x - 20, C.B1.visualEnd.y - 10, 40, C.B1.visualStart.y - C.B1.visualEnd.y + 20);
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(C.B1.visualStart.x - 20, C.B1.visualEnd.y - 10, 40, C.B1.visualStart.y - C.B1.visualEnd.y + 20);
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillText('LIFT UP 6M', C.B1.visualStart.x - 25, C.B1.visualStart.y + 20);
+
+            // Draw Pusher (A4)
+            const pX = C.A4.visualStart.x;
+            const pY = C.A4.visualStart.y;
+            ctx.fillStyle = '#f43f5e';
+            // Pusher base
+            ctx.fillRect(pX + 5, pY - 25, 20, 10);
+            // Pusher arm (animated)
+            let armLen = 10 + (pusherExtend * 15);
+            ctx.fillRect(pX + 13, pY - 15, 4, armLen);
+            ctx.fillRect(pX + 5, pY - 15 + armLen, 20, 4); // Pad
+
+            // Draw Destinations
+            ctx.fillStyle = '#2563eb'; // PM1
+            ctx.fillRect(C.A5.visualEnd.x, C.A5.visualEnd.y - 30, 60, 60);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 14px Arial';
+            ctx.fillText('PM 1', C.A5.visualEnd.x + 12, C.A5.visualEnd.y + 5);
+
+            ctx.fillStyle = '#ea580c'; // PM5
+            ctx.fillRect(C.A8.visualEnd.x, C.A8.visualEnd.y - 30, 60, 60);
+            ctx.fillStyle = '#fff';
+            ctx.fillText('PM 5', C.A8.visualEnd.x + 12, C.A8.visualEnd.y + 5);
+
+            // Draw Sensors
+            for (let key in Sensors) {
+                let s = Sensors[key];
+                // Base
+                ctx.fillStyle = '#1e293b';
+                ctx.beginPath();
+                ctx.arc(s.x, s.y - 15, 6, 0, Math.PI*2);
+                ctx.fill();
+                ctx.strokeStyle = '#475569';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // LED
+                if (s.state > 0) {
+                    ctx.fillStyle = '#10b981'; // Green active
+                    ctx.shadowColor = '#10b981';
+                    ctx.shadowBlur = 10;
+                } else {
+                    ctx.fillStyle = '#ef4444'; // Red idle
+                    ctx.shadowColor = 'transparent';
+                    ctx.shadowBlur = 0;
+                }
+                ctx.beginPath();
+                ctx.arc(s.x, s.y - 15, 3, 0, Math.PI*2);
+                ctx.fill();
+                ctx.shadowBlur = 0; // reset
+                
+                ctx.fillStyle = '#cbd5e1';
+                ctx.font = '9px Arial';
+                ctx.fillText(s.label, s.x - 15, s.y - 25);
+            }
+
+            // Draw Bags
+            for (let b of bags) {
+                let seg = C[b.segment];
+                let ratio = b.progress / seg.length;
+                
+                let bX, bY;
+
+                if (b.segment === 'A7') {
+                    // Curve calculation
+                    // Quadratic curve visual matching from (420,250) to (470,300) with control (420,300)
+                    let p0 = seg.visualStart;
+                    let p1 = { x: seg.visualStart.x, y: seg.visualEnd.y };
+                    let p2 = seg.visualEnd;
+                    
+                    let inv = 1 - ratio;
+                    bX = inv * inv * p0.x + 2 * inv * ratio * p1.x + ratio * ratio * p2.x;
+                    bY = inv * inv * p0.y + 2 * inv * ratio * p1.y + ratio * ratio * p2.y;
+                } else {
+                    // Linear interpolation
+                    bX = seg.visualStart.x + ratio * (seg.visualEnd.x - seg.visualStart.x);
+                    bY = seg.visualStart.y + ratio * (seg.visualEnd.y - seg.visualStart.y);
+                }
+
+                ctx.fillStyle = b.type === 'PM1' ? '#3b82f6' : '#f97316';
+                ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                ctx.shadowBlur = 4;
+                ctx.beginPath();
+                ctx.roundRect(bX - 10, bY - 8, 20, 16, 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                
+                // QR Detail
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(bX - 2, bY - 2, 4, 4);
+            }
+        }
+
+        // Main Loop
+        function loop(time) {
+            update(time);
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // Init
+        updateControls();
+        updateDashboard();
+        requestAnimationFrame(loop);
+    </script>
+</body>
+</html>
