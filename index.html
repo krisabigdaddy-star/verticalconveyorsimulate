@@ -3,723 +3,856 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Conveyor & Lift SCADA Simulation</title>
+    <title>Conveyor & Lift Physics Simulation</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Sarabun', sans-serif; background-color: #0f172a; color: #e2e8f0; margin: 0; }
-        .scada-panel { background-color: #1e293b; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        .scada-header { background: linear-gradient(90deg, #1e293b 0%, #334155 100%); border-bottom: 2px solid #3b82f6; }
-        canvas { background-color: #0b1121; border-radius: 8px; width: 100%; max-height: 550px; border: 1px solid #334155; }
-        .slider-custom { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: #475569; outline: none; }
-        .slider-custom::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #38bdf8; cursor: pointer; }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        /* แก้ไข Layout ให้ Scroll ได้ตามปกติ */
+        body { 
+            font-family: 'Sarabun', sans-serif; 
+            background-color: #0f172a; 
+            color: white; 
+            margin: 0; 
+            min-height: 100vh; 
+            overflow-y: auto; 
+        }
+        
+        .grid-layout { 
+            display: grid; 
+            grid-template-columns: 280px 1fr; 
+            gap: 20px; 
+            min-height: 100vh; 
+            padding: 20px; 
+            box-sizing: border-box; 
+        }
+        
+        /* ตรึงแผงควบคุมไว้ด้านซ้าย (Sticky) */
+        .side-panel { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px; 
+            position: sticky; 
+            top: 20px; 
+            height: calc(100vh - 40px); 
+            overflow-y: auto; 
+            padding-right: 5px; 
+        }
+
+        .main-panel { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px; 
+            min-width: 0; 
+        }
+
+        /* ปรับ Canvas ให้อยู่ในกรอบแบบ Responsive 100% */
+        .canvas-container { 
+            width: 100%; 
+            height: 65vh; /* ความสูงพอดีๆ ไม่ให้ล้นจอจนเกินไป */
+            min-height: 500px;
+            background: #0b1121; 
+            border: 1px solid #334155; 
+            border-radius: 8px; 
+            position: relative; 
+            overflow: hidden; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+        }
+        canvas { width: 100%; height: 100%; object-fit: contain; }
+        
+        input[type=range] { width: 100%; accent-color: #3b82f6; }
+        .btn { background: #3b82f6; padding: 8px 16px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s; border: none; color: white;}
+        .btn:hover { background: #2563eb; }
+        .stat-box { background: #334155; padding: 15px; border-radius: 4px; text-align: center; display: flex; flex-direction: column; justify-content: center;}
+        
+        /* กล่อง Log และ Report เพิ่มความสูงและ Scroll ได้ */
+        .log-box { 
+            background: #0f172a; 
+            border: 1px solid #334155; 
+            padding: 10px; 
+            font-family: monospace; 
+            font-size: 12px; 
+            height: 300px; 
+            overflow-y: auto; 
+            color: #94a3b8; 
+        }
+        
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+        .log-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+        /* Custom Scrollbar for modern look */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
     </style>
 </head>
-<body class="min-h-screen p-4 flex flex-col items-center">
+<body>
 
-    <div class="w-full max-w-[1400px]">
-        <div class="scada-header p-4 rounded-t-lg flex justify-between items-center">
-            <div>
-                <h1 class="text-2xl font-bold text-white tracking-wide">🏭 MATERIAL HANDLING SCADA</h1>
-                <p class="text-sm text-sky-400">Vertical Lift 6000mm & Sorting Conveyor System (Top-Down CAD View)</p>
-            </div>
-            <div class="flex items-center space-x-4">
-                <div class="flex flex-col items-end">
-                    <span class="text-xs text-slate-400">System Status</span>
-                    <span id="sysStatusTxt" class="text-lg font-bold text-emerald-400">STANDBY</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mt-4">
-            
-            <!-- LEFT PANEL: Controls -->
-            <div class="lg:col-span-3 space-y-4">
+    <div class="grid-layout">
+        
+        <!-- Left Panel: Controls (Sticky) -->
+        <div class="side-panel">
+            <div class="bg-slate-800 p-4 rounded-lg border border-slate-700 shadow-xl">
+                <h3 class="text-lg font-bold mb-3 text-blue-400">⚙️ Control Panel</h3>
                 
-                <div class="scada-panel p-4">
-                    <h3 class="text-sm font-bold text-slate-300 mb-3 flex items-center"><span class="mr-2">⚡</span> ความเร็วการทำงาน (Speed)</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-sm font-semibold flex items-center gap-2">👨‍🔧 Worker (Bags/Min)</label>
+                        <div class="mt-2 text-xs text-slate-400 space-y-2">
+                            <div class="flex items-center"><span class="w-20 text-yellow-400">Infeed:</span> <input type="range" id="infeedRate" min="2" max="20" value="6" oninput="document.getElementById('infeedRateVal').innerText=this.value"><span class="w-8 text-right font-bold" id="infeedRateVal">6</span></div>
+                            <div class="flex items-center"><span class="w-20 text-blue-400">Out PM1:</span> <input type="range" id="outPM1Rate" min="2" max="20" value="6" oninput="document.getElementById('outPM1RateVal').innerText=this.value"><span class="w-8 text-right font-bold" id="outPM1RateVal">6</span></div>
+                            <div class="flex items-center"><span class="w-20 text-orange-400">Out PM5:</span> <input type="range" id="outPM5Rate" min="2" max="20" value="6" oninput="document.getElementById('outPM5RateVal').innerText=this.value"><span class="w-8 text-right font-bold" id="outPM5RateVal">6</span></div>
+                        </div>
+                    </div>
+
+                    <hr class="border-slate-600">
                     
-                    <div class="mb-4">
-                        <div class="flex justify-between text-xs mb-1">
-                            <span class="text-sky-400">Infeed Worker (ป้อนเข้า)</span>
-                            <span class="font-bold"><span id="valInfeedRate">10</span> Bags/min</span>
+                    <div>
+                        <label class="text-sm font-semibold flex items-center gap-2">🚀 ความเร็วระบบ (m/min)</label>
+                        <div class="mt-2 text-xs text-slate-400 space-y-2">
+                            <div class="flex items-center"><span class="w-20 text-emerald-400">CV Speed:</span> <input type="range" id="cvSpeed" min="10" max="60" value="20" oninput="document.getElementById('cvSpeedVal').innerText=this.value; updateSpeeds();"><span class="w-8 text-right font-bold" id="cvSpeedVal">20</span></div>
+                            <div class="flex items-center"><span class="w-20 text-sky-400">Lift Speed:</span> <input type="range" id="liftSpeed" min="10" max="40" value="15" oninput="document.getElementById('liftSpeedVal').innerText=this.value; updateSpeeds();"><span class="w-8 text-right font-bold" id="liftSpeedVal">15</span></div>
                         </div>
-                        <input type="range" id="setInfeedRate" min="2" max="30" value="10" class="slider-custom" oninput="updateVal('valInfeedRate', this.value)">
                     </div>
 
-                    <div class="mb-4">
-                        <div class="flex justify-between text-xs mb-1">
-                            <span class="text-blue-400">PM1 Worker (กรีดเท)</span>
-                            <span class="font-bold"><span id="valPM1Rate">6</span> Bags/min</span>
+                    <hr class="border-slate-600">
+
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-sm font-semibold flex items-center gap-2">📦 Batch Queue</label>
+                            <button class="text-xs bg-red-900/50 text-red-400 px-2 py-1 rounded hover:bg-red-800 transition" onclick="clearQueue()">ล้างคิว</button>
                         </div>
-                        <input type="range" id="setPM1Rate" min="2" max="20" value="6" class="slider-custom" oninput="updateVal('valPM1Rate', this.value)">
+                        <div class="flex gap-2 mb-2">
+                            <div class="w-1/2">
+                                <label class="text-[10px] text-blue-400">PM1 (ถุง)</label>
+                                <input type="number" id="qPM1" value="65" class="w-full bg-slate-700 text-white p-1 rounded text-sm text-center border border-slate-600">
+                            </div>
+                            <div class="w-1/2">
+                                <label class="text-[10px] text-orange-400">PM5 (ถุง)</label>
+                                <input type="number" id="qPM5" value="65" class="w-full bg-slate-700 text-white p-1 rounded text-sm text-center border border-slate-600">
+                            </div>
+                            <button onclick="addBatch()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 rounded text-sm mt-4 transition">+</button>
+                        </div>
+                        <div id="queueList" class="bg-slate-900 p-2 rounded text-xs h-32 overflow-y-auto space-y-1 text-slate-400 border border-slate-700 flex flex-col justify-center items-center">
+                            ไม่มีคิวผลิต
+                        </div>
                     </div>
 
-                    <div class="mb-4 border-b border-slate-700 pb-4">
-                        <div class="flex justify-between text-xs mb-1">
-                            <span class="text-orange-400">PM5 Worker (กรีดเท)</span>
-                            <span class="font-bold"><span id="valPM5Rate">6</span> Bags/min</span>
-                        </div>
-                        <input type="range" id="setPM5Rate" min="2" max="20" value="6" class="slider-custom" oninput="updateVal('valPM5Rate', this.value)">
-                    </div>
+                    <hr class="border-slate-600">
 
-                    <div class="mb-4 mt-4">
-                        <div class="flex justify-between text-xs mb-1">
-                            <span class="text-slate-400">Lift Speed (B1 6m)</span>
-                            <span class="font-bold"><span id="valLiftSpd">20</span> m/min</span>
+                    <div>
+                        <label class="text-sm font-semibold flex items-center gap-2 mb-2">⏱️ ตั้งค่าเวลาเครื่อง Mix/Pack (นาที)</label>
+                        <div class="flex gap-2">
+                            <div class="text-xs text-blue-400 flex items-center gap-1 bg-slate-900 p-1 rounded border border-slate-700 w-1/2 justify-center">
+                                PM1: <input type="number" id="pm1MixT" value="6" class="w-8 bg-slate-700 text-white p-1 rounded text-center border border-slate-600 outline-none"> / <input type="number" id="pm1PackT" value="20" class="w-10 bg-slate-700 text-white p-1 rounded text-center border border-slate-600 outline-none">
+                            </div>
+                            <div class="text-xs text-orange-400 flex items-center gap-1 bg-slate-900 p-1 rounded border border-slate-700 w-1/2 justify-center">
+                                PM5: <input type="number" id="pm5MixT" value="8" class="w-8 bg-slate-700 text-white p-1 rounded text-center border border-slate-600 outline-none"> / <input type="number" id="pm5PackT" value="20" class="w-10 bg-slate-700 text-white p-1 rounded text-center border border-slate-600 outline-none">
+                            </div>
                         </div>
-                        <input type="range" id="setLiftSpd" min="10" max="30" value="20" class="slider-custom" oninput="updateVal('valLiftSpd', this.value)">
                     </div>
 
                     <div>
-                        <div class="flex justify-between text-xs mb-1">
-                            <span class="text-slate-400">Conveyor Speed (A1-A8)</span>
-                            <span class="font-bold"><span id="valCvSpd">20</span> m/min</span>
-                        </div>
-                        <input type="range" id="setCvSpd" min="10" max="40" value="20" class="slider-custom" oninput="updateVal('valCvSpd', this.value)">
-                    </div>
-                </div>
-
-                <div class="scada-panel p-4">
-                    <h3 class="text-sm font-bold text-slate-300 mb-3 flex items-center justify-between">
-                        <span>📋 Batch Queue</span>
-                        <button onclick="clearQueue()" class="text-xs bg-rose-900/50 text-rose-300 px-2 py-1 rounded hover:bg-rose-800">Clear</button>
-                    </h3>
-                    <div class="flex space-x-2 mb-3">
-                        <input type="number" id="qPM1" placeholder="PM1 (ถุง)" value="34" class="w-full bg-slate-800 border border-slate-600 rounded p-1 text-sm text-center">
-                        <input type="number" id="qPM5" placeholder="PM5 (ถุง)" value="0" class="w-full bg-slate-800 border border-slate-600 rounded p-1 text-sm text-center">
-                        <button onclick="addQueue()" class="bg-sky-600 hover:bg-sky-500 text-white px-3 rounded font-bold">+</button>
-                    </div>
-                    <div id="queueList" class="bg-slate-900 border border-slate-700 rounded h-24 overflow-y-auto p-2 text-xs space-y-1 custom-scrollbar">
-                        <div class="text-slate-500 text-center mt-6">ไม่มีคิวผลิต</div>
-                    </div>
-
-                    <div class="mt-4 border-t border-slate-700 pt-3">
-                        <label class="text-xs text-slate-400 mb-1 block">เครื่องจักร (นาที): Mix / Pack</label>
-                        <div class="grid grid-cols-2 gap-2 text-xs mb-3">
-                            <div class="flex space-x-1"><span class="w-8">PM1:</span><input type="number" id="pm1MixT" value="6" class="w-10 bg-slate-800 border border-slate-600 rounded text-center"><input type="number" id="pm1PackT" value="20" class="w-10 bg-slate-800 border border-slate-600 rounded text-center"></div>
-                            <div class="flex space-x-1"><span class="w-8">PM5:</span><input type="number" id="pm5MixT" value="8" class="w-10 bg-slate-800 border border-slate-600 rounded text-center"><input type="number" id="pm5PackT" value="20" class="w-10 bg-slate-800 border border-slate-600 rounded text-center"></div>
-                        </div>
-
-                        <select id="runMode" class="w-full bg-slate-800 border border-slate-600 rounded p-1 text-xs mb-2">
-                            <option value="continuous">🔥 รันต่อเนื่อง (ซ้อนคิวได้ ลดเวลา)</option>
-                            <option value="sequential">🛑 รันทีละ Batch (รอเคลียร์สายพาน)</option>
+                        <label class="text-sm font-semibold">⚡ Run Mode</label>
+                        <select id="runMode" class="w-full mt-1 bg-slate-700 text-white text-xs p-2 rounded border border-slate-600 focus:outline-none">
+                            <option value="continuous">ต่อเนื่อง (ไม่ต้องรอเครื่องแพ็ค)</option>
+                            <option value="wait">ทีละ Batch (รอเคลียร์สายพาน)</option>
                         </select>
-                        <select id="simSpeed" class="w-full bg-slate-800 border border-slate-600 rounded p-1 text-xs mb-3">
-                            <option value="1">⏱️ ความเร็ว 1x (เวลาจริง)</option>
-                            <option value="5">🚀 ความเร็ว 5x</option>
-                            <option value="20">⚡ ความเร็ว 20x</option>
-                            <option value="60" selected>🔥 ความเร็ว 60x (เร็วสุด)</option>
+                    </div>
+
+                    <div>
+                        <label class="text-sm font-semibold">⏩ Simulator Speed</label>
+                        <select id="simSpeedMode" class="w-full mt-1 bg-slate-700 text-white text-xs p-2 rounded border border-slate-600 focus:outline-none" onchange="timeMultiplier = parseInt(this.value)">
+                            <option value="1">1x (เวลาจริง)</option>
+                            <option value="5">5x (เร็ว)</option>
+                            <option value="20" selected>20x (เร็วมาก)</option>
+                            <option value="60">60x (Hyper)</option>
                         </select>
-                        
-                        <button id="btnSim" onclick="toggleSim()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded uppercase tracking-wide">
-                            ▶️ Start Simulation
-                        </button>
                     </div>
+                    
                 </div>
+
+                <button id="mainBtn" class="btn bg-emerald-600 hover:bg-emerald-500 w-full mt-6 py-3 text-lg shadow-lg shadow-emerald-900/50 uppercase tracking-wider" onclick="toggleSim()">▶ Start Simulation</button>
             </div>
-
-            <!-- CENTER PANEL: Canvas -->
-            <div class="lg:col-span-6 scada-panel p-2 flex flex-col relative">
-                <canvas id="simCanvas" width="900" height="550" class="flex-1"></canvas>
-                
-                <!-- Status Overlay on Canvas -->
-                <div class="absolute bottom-4 left-4 right-4 flex justify-between px-4 pointer-events-none">
-                    <div class="bg-slate-900/80 p-2 rounded border border-slate-700">
-                        <p class="text-[10px] text-slate-400">LIFT (B1) SENSOR S2</p>
-                        <p id="stWait" class="text-xs font-bold text-amber-400">รอถาดลิฟต์เฉลี่ย: 0.0s</p>
-                        <p id="stQLift" class="text-xs font-bold text-red-400">คิวหน้าลิฟต์: 0 ถุง</p>
-                    </div>
-                    <div class="bg-slate-900/80 p-2 rounded border border-slate-700 text-right">
-                        <p class="text-[10px] text-slate-400">SIMULATION TIME</p>
-                        <p id="stTime" class="text-xl font-bold text-white font-mono tracking-wider">00:00:00</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- RIGHT PANEL: Logs and Reports -->
-            <div class="lg:col-span-3 space-y-4 flex flex-col h-full">
-                <!-- Event Logs -->
-                <div class="scada-panel p-4 flex-1 flex flex-col">
-                    <h3 class="text-sm font-bold text-slate-300 mb-2 border-b border-slate-700 pb-2">📋 Event Logs</h3>
-                    <div id="logBox" class="flex-1 bg-slate-900 border border-slate-700 rounded p-2 text-[11px] font-mono overflow-y-auto space-y-1 custom-scrollbar">
-                        <div class="text-slate-500">System Ready.</div>
-                    </div>
-                </div>
-
-                <!-- Batch Summary Report -->
-                <div class="scada-panel p-4 h-[250px] flex flex-col">
-                    <h3 class="text-sm font-bold text-slate-300 mb-2 border-b border-slate-700 pb-2">📊 Batch Summary Report</h3>
-                    <div id="reportBox" class="flex-1 bg-slate-900 border border-slate-700 rounded p-2 overflow-y-auto space-y-2 custom-scrollbar">
-                        <div class="text-slate-500 text-xs text-center mt-4">รายงานจะแสดงเมื่อผลิตเสร็จ</div>
-                    </div>
-                </div>
-            </div>
-
         </div>
+
+        <!-- Right Panel: Main Visualization -->
+        <div class="main-panel">
+            <!-- Stats Row -->
+            <div class="stats-grid">
+                <div class="stat-box border-b-4 border-blue-500 shadow-md">
+                    <p class="text-xs text-slate-400 uppercase tracking-widest">Infeed PM1</p>
+                    <p id="statIn1" class="text-3xl font-bold text-blue-400">0</p>
+                </div>
+                <div class="stat-box border-b-4 border-blue-500 shadow-md">
+                    <p class="text-xs text-slate-400 uppercase tracking-widest">Outfeed PM1</p>
+                    <p id="statOut1" class="text-3xl font-bold text-blue-400">0</p>
+                </div>
+                <div class="stat-box border-b-4 border-orange-500 shadow-md">
+                    <p class="text-xs text-slate-400 uppercase tracking-widest">Infeed PM5</p>
+                    <p id="statIn5" class="text-3xl font-bold text-orange-400">0</p>
+                </div>
+                <div class="stat-box border-b-4 border-orange-500 shadow-md">
+                    <p class="text-xs text-slate-400 uppercase tracking-widest">Outfeed PM5</p>
+                    <p id="statOut5" class="text-3xl font-bold text-orange-400">0</p>
+                </div>
+            </div>
+
+            <!-- Canvas Container -->
+            <div class="canvas-container shadow-inner">
+                <canvas id="simCanvas" width="1200" height="800"></canvas>
+            </div>
+
+            <!-- Logs and Reports Row -->
+            <div class="log-grid">
+                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3 shadow-md">
+                    <h4 class="text-sm font-bold text-slate-300 mb-2 flex items-center gap-2">📄 Event Logs</h4>
+                    <div id="eventLog" class="log-box rounded bg-slate-900"></div>
+                </div>
+                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3 shadow-md">
+                    <h4 class="text-sm font-bold text-slate-300 mb-2 flex items-center gap-2">📊 Batch Summary Report</h4>
+                    <div id="reportBox" class="log-box rounded bg-slate-900 p-2 flex flex-col items-center text-center">
+                        รอถาดำเนินการ Batch แรก...
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script>
-        function updateVal(id, val) { document.getElementById(id).innerText = val; }
-
-        // --- Layout Data (CAD Matching & Path Distances) ---
-        // We use physical distance (meters) along the path to calculate movement.
-        const DIST = {
-            A1_A2: 4.41,
-            LIFT: 6.0,
-            A3: 2.31,
-            A4: 0.64,
-            A5: 4.20,
-            A6: 3.19,
-            A7: 1.25,
-            A8: 3.70
-        };
-
-        // Milestone positions along the continuous path (Excluding Lift which is handled separately)
-        const PATH = {
-            InfeedEnd: DIST.A1_A2,                                  // 4.41
-            A3End: DIST.A1_A2 + DIST.A3,                            // 6.72
-            A4End: DIST.A1_A2 + DIST.A3 + DIST.A4,                  // 7.36
-            PM1End: DIST.A1_A2 + DIST.A3 + DIST.A4 + DIST.A5,       // 11.56
-            A6End: DIST.A1_A2 + DIST.A3 + DIST.A4 + DIST.A6,        // 10.55
-            A7End: DIST.A1_A2 + DIST.A3 + DIST.A4 + DIST.A6 + DIST.A7, // 11.80
-            PM5End: DIST.A1_A2 + DIST.A3 + DIST.A4 + DIST.A6 + DIST.A7 + DIST.A8 // 15.50
-        };
-
-        // --- System State ---
+        // System Config
+        const SCALE = 65; 
+        let timeMultiplier = 20;
         let isRunning = false;
-        let timeMult = 60;
         let lastTime = 0;
-        let simTimeSec = 0;
-        let runMode = 'continuous'; // continuous | sequential
+        let simTimeElapsed = 0; // minutes
         
-        let batchQueue = [];
-        let activeBatch = null;
-        let batchCounter = 1;
+        let SPEED_CV = 20; // m/min
+        let SPEED_LIFT = 15; // m/min
 
-        let bags = [];
-        let liftCyclePos = 0; // 0 to 2 meters (Tray spacing)
-        const TRAY_SPACING = 2; // 6 trays on 12m loop
-
-        let pusherExt = 0; // Animation for A4 Sorter
+        // Physical Constants (Meters)
+        const BAG_LENGTH = 0.95; // ขนาดถุง 90cm + 5cm clearance
+        const TRAY_SPACING = 2.0; 
         
-        // Machine States
-        const MACH = {
-            PM1: { state: 'idle', count: 0, target: 0, mixTime: 0, packTime: 0, timer: 0 },
-            PM5: { state: 'idle', count: 0, target: 0, mixTime: 0, packTime: 0, timer: 0 }
+        const PATH = {
+            InfeedEnd: 4.41,   
+            LiftLen: 6.0,      
+            A3End: 2.3,
+            PM1End: 2.3 + 4.2, 
+            A4End: 2.3,      
+            PM5End: 2.3 + 3.19 + 1.25 + 3.7 
         };
 
-        let stats = { qLift: 0, waitTimes: [] };
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const logBox = document.getElementById('eventLog');
+        const reportBox = document.getElementById('reportBox');
+        
+        // System State
+        let queues = { 'PM1': [], 'PM5': [] };
+        let activeInfeed = { 'PM1': null, 'PM5': null };
+        let lastFedType = 'PM5'; 
+        let batchCounters = { 'PM1': 1, 'PM5': 1 };
+        
+        let bags = [];
+        let liftCycle = 0;
+        let infeedTimer = 0;
 
-        // --- STREAMING_CHUNK: Implementing UI Handlers and Logging ---
-        function logMsg(msg, type='info') {
-            const timeStr = formatTime(simTimeSec);
-            let color = 'text-slate-300';
-            if(type === 'pm1') color = 'text-blue-400';
-            if(type === 'pm5') color = 'text-orange-400';
-            if(type === 'warn') color = 'text-rose-400 font-bold';
-            if(type === 'success') color = 'text-emerald-400';
-            
-            const logBox = document.getElementById('logBox');
-            logBox.insertAdjacentHTML('afterbegin', `<div class="${color}">[${timeStr}] ${msg}</div>`);
-            if (logBox.children.length > 50) logBox.lastElementChild.remove();
+        let stats = { in1: 0, out1: 0, in5: 0, out5: 0 };
+
+        // Machines State & Timings memory
+        let machines = {
+            'PM1': { state: 'IDLE', timer: 0, ulTimer: 0, q: 0, currentBatchId: null, currentBatchTotal: 0, timings: {} },
+            'PM5': { state: 'IDLE', timer: 0, ulTimer: 0, q: 0, currentBatchId: null, currentBatchTotal: 0, timings: {} }
+        };
+
+        function updateSpeeds() {
+            SPEED_CV = parseFloat(document.getElementById('cvSpeed').value);
+            SPEED_LIFT = parseFloat(document.getElementById('liftSpeed').value);
         }
 
-        function formatTime(totalSeconds) {
-            const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
-            const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
-            const s = Math.floor(totalSeconds % 60).toString().padStart(2, '0');
-            return `${h}:${m}:${s}`;
+        function addBatch() {
+            let p1 = parseInt(document.getElementById('qPM1').value);
+            let p2 = parseInt(document.getElementById('qPM5').value);
+            if(p1 > 0) queues['PM1'].push({ id: batchCounters['PM1']++, type: 'PM1', total: p1, left: p1 });
+            if(p2 > 0) queues['PM5'].push({ id: batchCounters['PM5']++, type: 'PM5', total: p2, left: p2 });
+            updateQueueUI();
         }
 
         function clearQueue() {
-            batchQueue = [];
-            batchCounter = 1;
-            renderQueue();
+            queues = { 'PM1': [], 'PM5': [] };
+            activeInfeed = { 'PM1': null, 'PM5': null };
+            batchCounters = { 'PM1': 1, 'PM5': 1 };
+            updateQueueUI();
         }
 
-        function addQueue() {
-            const t1 = parseInt(document.getElementById('qPM1').value) || 0;
-            const t5 = parseInt(document.getElementById('qPM5').value) || 0;
-            if (t1 === 0 && t5 === 0) return;
-            
-            batchQueue.push({ id: `B${batchCounter++}`, pm1: t1, pm5: t5, status: 'รอคิว' });
-            renderQueue();
-        }
+        function updateQueueUI() {
+            const q = document.getElementById('queueList');
+            let hasActive = activeInfeed['PM1'] || activeInfeed['PM5'];
+            let hasQueue = queues['PM1'].length > 0 || queues['PM5'].length > 0;
 
-        function renderQueue() {
-            const qList = document.getElementById('queueList');
-            qList.innerHTML = '';
-            if (batchQueue.length === 0) {
-                qList.innerHTML = '<div class="text-slate-500 text-center mt-6">ไม่มีคิวผลิต</div>';
+            if(!hasActive && !hasQueue) {
+                q.innerHTML = 'ไม่มีคิวผลิต';
+                q.classList.add('justify-center', 'items-center');
                 return;
             }
-            batchQueue.forEach((q, i) => {
-                let bg = i === 0 ? 'bg-slate-700 border-sky-500' : 'bg-slate-800 border-slate-700';
-                qList.innerHTML += `
-                    <div class="p-1.5 border rounded flex justify-between items-center ${bg}">
-                        <span class="font-bold text-sky-400">${q.id}</span>
-                        <span><span class="text-blue-400">PM1:${q.pm1}</span> | <span class="text-orange-400">PM5:${q.pm5}</span></span>
-                        <span class="text-[10px] ${q.status==='รอคิว'?'text-slate-400':'text-emerald-400'}">${q.status}</span>
-                    </div>
-                `;
+            q.classList.remove('justify-center', 'items-center');
+            let html = '';
+
+            ['PM1', 'PM5'].forEach(type => {
+                if(activeInfeed[type]) {
+                    let b = activeInfeed[type];
+                    let color = type === 'PM1' ? 'text-blue-400' : 'text-orange-400';
+                    html += `<div class="p-1.5 border border-emerald-500/50 bg-emerald-900/20 rounded mb-1 shadow-sm">
+                        <span class="text-emerald-400 text-[10px] animate-pulse">▶ กำลังป้อน:</span> 
+                        <span class="${color} font-bold">B${b.id} (${b.type})</span> 
+                        <span class="text-slate-300 ml-1">- เหลือ ${b.left}/${b.total} ถุง</span>
+                    </div>`;
+                }
             });
+
+            let maxLen = Math.max(queues['PM1'].length, queues['PM5'].length);
+            for(let i=0; i<maxLen; i++) {
+                if(queues['PM1'][i]) {
+                    let b = queues['PM1'][i];
+                    html += `<div class="p-1 border border-slate-700 bg-slate-800 rounded mb-1 text-slate-300">รอคิว: <span class="text-blue-400 font-bold">B${b.id} (PM1)</span> - ${b.total} ถุง</div>`;
+                }
+                if(queues['PM5'][i]) {
+                    let b = queues['PM5'][i];
+                    html += `<div class="p-1 border border-slate-700 bg-slate-800 rounded mb-1 text-slate-300">รอคิว: <span class="text-orange-400 font-bold">B${b.id} (PM5)</span> - ${b.total} ถุง</div>`;
+                }
+            }
+            q.innerHTML = html;
+        }
+
+        function addLog(msg, type='normal') {
+            const d = new Date(simTimeElapsed * 60000);
+            const timeStr = d.toISOString().substr(14, 5);
+            let color = '#94a3b8';
+            if(type==='info') color = '#60a5fa';
+            if(type==='success') color = '#34d399';
+            if(type==='warn') color = '#fbbf24';
+            if(type==='error') color = '#ef4444';
+            
+            const m = `<div style="color:${color}" class="mb-1 border-b border-slate-800/50 pb-1">[${timeStr}] ${msg}</div>`;
+            logBox.innerHTML += m;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function addReport(machine, batchId, timeMins, isFirst) {
+            if(reportBox.innerText.includes('รอถาดำเนินการ')) {
+                reportBox.innerHTML = '';
+                reportBox.classList.remove('justify-center', 'items-center', 'text-center');
+                reportBox.classList.add('items-stretch', 'text-left');
+            }
+            
+            let remark = isFirst ? 
+                "(คำนวณตั้งแต่ถุงแรกเข้าจุด Infeed)" : 
+                "(คำนวณตั้งแต่เริ่มเทถุงแรกที่ Outfeed)";
+            
+            let borderColor = machine === 'PM1' ? 'border-blue-500' : 'border-orange-500';
+            let icon = machine === 'PM1' ? '🔵' : '🟠';
+            
+            let html = `
+            <div class="bg-slate-800/80 p-2.5 rounded mb-2 border-l-4 ${borderColor} shadow-sm w-full">
+                <div class="font-bold text-white text-sm">${icon} [${machine}] Batch #${batchId} แพ็คเสร็จสมบูรณ์</div>
+                <div class="text-xs text-slate-300 mt-1 flex justify-between items-center">
+                    <span>⏱️ Process Time:</span>
+                    <span class="text-emerald-400 font-bold bg-emerald-900/30 px-2 py-0.5 rounded border border-emerald-800">${timeMins.toFixed(1)} นาที</span>
+                </div>
+                <div class="text-[10px] text-slate-500 mt-1 italic">${remark}</div>
+            </div>`;
+            
+            reportBox.innerHTML += html; // Add to bottom (Chronological order)
+            reportBox.scrollTop = reportBox.scrollHeight; // Auto scroll to bottom
         }
 
         function toggleSim() {
-            if (isRunning) {
-                isRunning = false;
-                document.getElementById('btnSim').innerText = '▶️ Start Simulation';
-                document.getElementById('btnSim').className = 'w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded uppercase tracking-wide';
-                document.getElementById('sysStatusTxt').innerText = 'PAUSED';
-                document.getElementById('sysStatusTxt').className = 'text-lg font-bold text-amber-400';
-            } else {
-                if (batchQueue.length === 0 && !activeBatch) {
-                    alert("กรุณาเพิ่มคิวผลิต (Batch Queue) ก่อนเริ่มระบบ");
-                    return;
-                }
-                
-                // Update params
-                timeMult = parseInt(document.getElementById('simSpeed').value);
-                runMode = document.getElementById('runMode').value;
-                
-                isRunning = true;
+            isRunning = !isRunning;
+            const btn = document.getElementById('mainBtn');
+            if(isRunning) {
+                btn.innerHTML = '⏸ <span class="tracking-widest">Pause Simulation</span>';
+                btn.classList.replace('bg-emerald-600', 'bg-amber-600');
+                btn.classList.replace('hover:bg-emerald-500', 'hover:bg-amber-500');
+                btn.classList.replace('shadow-emerald-900/50', 'shadow-amber-900/50');
                 lastTime = performance.now();
-                document.getElementById('btnSim').innerText = '⏸️ Pause';
-                document.getElementById('btnSim').className = 'w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 rounded uppercase tracking-wide';
-                document.getElementById('sysStatusTxt').innerText = 'RUNNING';
-                document.getElementById('sysStatusTxt').className = 'text-lg font-bold text-emerald-400';
-                logMsg('System Started.', 'success');
                 requestAnimationFrame(simLoop);
+                addLog('▶️ System Started', 'success');
+            } else {
+                btn.innerHTML = '▶ <span class="tracking-widest">Start Simulation</span>';
+                btn.classList.replace('bg-amber-600', 'bg-emerald-600');
+                btn.classList.replace('hover:bg-amber-500', 'hover:bg-emerald-500');
+                btn.classList.replace('shadow-amber-900/50', 'shadow-emerald-900/50');
+                addLog('⏸ System Paused', 'error');
             }
         }
 
-        function createBatchRecord(bData) {
-            return {
-                id: bData.id,
-                tPM1: bData.pm1, tPM5: bData.pm5,
-                spawnedPM1: 0, spawnedPM5: 0,
-                donePM1: 0, donePM5: 0,
-                startTime: simTimeSec, waitTimeSec: 0,
-                pm1State: bData.pm1 > 0 ? 'running' : 'done',
-                pm5State: bData.pm5 > 0 ? 'running' : 'done'
-            };
-        }
+        function simLoop(timestamp) {
+            if(!isRunning) return;
+            const dtSec = ((timestamp - lastTime) / 1000) * timeMultiplier;
+            const dtMin = dtSec / 60;
+            lastTime = timestamp;
+            simTimeElapsed += dtMin;
 
-        // --- STREAMING_CHUNK: Implementing the Physics and Simulation Loop ---
-        function getParams() {
-            return {
-                inRate: parseFloat(document.getElementById('setInfeedRate').value) / 60, // bags/sec
-                pm1Rate: parseFloat(document.getElementById('setPM1Rate').value) / 60,
-                pm5Rate: parseFloat(document.getElementById('setPM5Rate').value) / 60,
-                liftSpd: parseFloat(document.getElementById('setLiftSpd').value) / 60, // m/sec
-                cvSpd: parseFloat(document.getElementById('setCvSpd').value) / 60,
-                m1Mix: parseFloat(document.getElementById('pm1MixT').value) * 60,
-                m1Pack: parseFloat(document.getElementById('pm1PackT').value) * 60,
-                m5Mix: parseFloat(document.getElementById('pm5MixT').value) * 60,
-                m5Pack: parseFloat(document.getElementById('pm5PackT').value) * 60,
-            };
-        }
-
-        let infeedTimer = 0;
-        let lastSpawnType = 'PM1';
-
-        function simLoop(time) {
-            if (!isRunning) return;
-            const dtRaw = (time - lastTime) / 1000;
-            lastTime = time;
-            
-            // Limit dt to prevent huge jumps if tab was inactive
-            if(dtRaw > 0.5) { requestAnimationFrame(simLoop); return; }
-            
-            const dt = dtRaw * timeMult;
-            simTimeSec += dt;
-            const P = getParams();
-
-            // 1. Batch Logic (State Machine)
-            if (!activeBatch && batchQueue.length > 0) {
-                const bData = batchQueue.shift();
-                activeBatch = createBatchRecord(bData);
-                MACH.PM1.target = activeBatch.tPM1; MACH.PM1.count = 0; MACH.PM1.state = 'unloading';
-                MACH.PM5.target = activeBatch.tPM5; MACH.PM5.count = 0; MACH.PM5.state = 'unloading';
-                logMsg(`Start Batch ${activeBatch.id}`, 'success');
-                renderQueue();
-            }
-
-            // Check Batch Completion
-            if (activeBatch && activeBatch.pm1State === 'done' && activeBatch.pm5State === 'done') {
-                const leadTime = simTimeSec - activeBatch.startTime;
-                const procTime = leadTime - activeBatch.waitTimeSec;
-                
-                const html = `
-                    <div class="bg-slate-800 p-2 rounded border-l-4 border-emerald-500 mb-2">
-                        <div class="font-bold text-emerald-400 text-sm mb-1">${activeBatch.id} Completed</div>
-                        <div class="text-[10px] grid grid-cols-2 gap-1 text-slate-300">
-                            <div>Lead Time: <span class="font-bold text-white">${formatTime(leadTime)}</span></div>
-                            <div>Process Time: <span class="font-bold text-sky-300">${formatTime(procTime)}</span></div>
-                            <div class="col-span-2">Wait Time: <span class="font-bold text-amber-400">${formatTime(activeBatch.waitTimeSec)}</span></div>
-                        </div>
-                    </div>`;
-                document.getElementById('reportBox').insertAdjacentHTML('afterbegin', html);
-                logMsg(`Batch ${activeBatch.id} Finished.`, 'success');
-                
-                activeBatch = null;
-                // Immediate next logic handled at start of next frame
-            }
-
-            // 2. Infeed Spawner
-            let canSpawn = false;
-            let typeToSpawn = null;
-            let spawnReasonStop = "";
-
-            if (activeBatch) {
-                if (runMode === 'sequential' && (MACH.PM1.state !== 'unloading' || MACH.PM5.state !== 'unloading' || MACH.PM1.count === MACH.PM1.target || MACH.PM5.count === MACH.PM5.target)) {
-                    // In sequential mode, stop spawning if we are mixing/packing or if we finished unloading the current batch targets.
-                    // Actually, if we spawned all, we stop.
-                    if (activeBatch.spawnedPM1 < activeBatch.tPM1 || activeBatch.spawnedPM5 < activeBatch.tPM5) {
-                         canSpawn = true;
-                    } else {
-                        spawnReasonStop = "Waiting for Batch clearance (Sequential Mode)";
+            // 1. Infeed Logic: แยกการทำงานจากเครื่องจักร
+            ['PM1', 'PM5'].forEach(type => {
+                if (!activeInfeed[type] && queues[type].length > 0) {
+                    const runMode = document.getElementById('runMode').value;
+                    let canStart = true;
+                    if (runMode === 'wait') {
+                        if (machines[type].state !== 'IDLE' || bags.some(b => b.type === type)) {
+                            canStart = false;
+                        }
                     }
-                } else {
-                    // Continuous mode or unloading phase
-                    canSpawn = true;
+                    if (canStart) {
+                        activeInfeed[type] = queues[type].shift();
+                        // Record True Infeed Start Time for this Batch
+                        if(!machines[type].timings[activeInfeed[type].id]) {
+                            machines[type].timings[activeInfeed[type].id] = { infeedStart: simTimeElapsed };
+                        }
+                        
+                        addLog(`👨‍🔧 Infeed เริ่มเท ${type} Batch #${activeInfeed[type].id}`);
+                        updateQueueUI();
+                    }
                 }
-            } else if (batchQueue.length > 0 && runMode === 'continuous') {
-                 // Sneak peek next batch if continuous
-                 canSpawn = false; // Will spawn next frame when activeBatch is set
+            });
+
+            // เลือกว่าจะเท PM1 หรือ PM5 แบบสลับกัน (Balance Load)
+            let typeToFeed = null;
+            if (activeInfeed['PM1'] && activeInfeed['PM5']) {
+                typeToFeed = lastFedType === 'PM1' ? 'PM5' : 'PM1';
+            } else if (activeInfeed['PM1']) {
+                typeToFeed = 'PM1';
+            } else if (activeInfeed['PM5']) {
+                typeToFeed = 'PM5';
             }
 
-            if (canSpawn && activeBatch) {
-                // Check physical space at pos 0
-                const isBlocked = bags.some(b => b.stage === 'convey' && b.pos < 0.6);
-                if (isBlocked) {
-                    spawnReasonStop = "Infeed Blocked (Accumulation)";
-                } else {
-                    infeedTimer += dt;
-                    if (infeedTimer >= (1 / P.inRate)) {
-                        infeedTimer = 0;
-                        // Alternate spawning based on remaining targets
-                        let s1 = activeBatch.spawnedPM1 < activeBatch.tPM1;
-                        let s5 = activeBatch.spawnedPM5 < activeBatch.tPM5;
-                        
-                        if (s1 && s5) { typeToSpawn = (lastSpawnType === 'PM1') ? 'PM5' : 'PM1'; }
-                        else if (s1) { typeToSpawn = 'PM1'; }
-                        else if (s5) { typeToSpawn = 'PM5'; }
+            if (typeToFeed) {
+                infeedTimer -= dtMin;
+                if(infeedTimer <= 0) {
+                    let maxPos = PATH.InfeedEnd;
+                    for (let other of bags) {
+                        if (other.stage === 'infeed' || other.stage === 'wait_lift') {
+                            maxPos = Math.min(maxPos, other.pos - BAG_LENGTH);
+                        }
+                    }
+                    let isSpaceFree = (maxPos >= 0);
 
-                        if (typeToSpawn) {
-                            bags.push({
-                                id: Math.random(), type: typeToSpawn, batchId: activeBatch.id,
-                                stage: 'convey', pos: 0, waitStart: 0
-                            });
-                            if (typeToSpawn === 'PM1') activeBatch.spawnedPM1++; else activeBatch.spawnedPM5++;
-                            lastSpawnType = typeToSpawn;
+                    if (isSpaceFree) {
+                        const rate = parseFloat(document.getElementById('infeedRate').value);
+                        infeedTimer = 1 / rate;
+                        let batch = activeInfeed[typeToFeed];
+                        
+                        bags.push({
+                            id: Math.random(),
+                            type: batch.type,
+                            batchId: batch.id,
+                            batchTotal: batch.total, 
+                            stage: 'infeed', 
+                            pos: 0
+                        });
+                        batch.left--;
+                        lastFedType = typeToFeed; 
+
+                        if(batch.type === 'PM1') stats.in1++; else stats.in5++;
+                        updateQueueUI();
+
+                        if(batch.left <= 0) {
+                            addLog(`✅ Infeed ป้อน ${batch.type} Batch #${batch.id} ครบแล้ว`);
+                            activeInfeed[typeToFeed] = null;
+                            updateQueueUI();
+                        }
+                    } else {
+                        infeedTimer = 0; 
+                    }
+                }
+            } else {
+                infeedTimer = 0;
+            }
+
+            // 2. Machine Processing
+            ['PM1', 'PM5'].forEach(mKey => {
+                let m = machines[mKey];
+                if(m.state === 'MIXING' || m.state === 'PACKING') {
+                    m.timer -= dtMin;
+                    if(m.timer <= 0) {
+                        if(m.state === 'MIXING') {
+                            m.state = 'PACKING';
+                            m.timer = parseFloat(document.getElementById(mKey.toLowerCase()+'PackT').value);
+                            addLog(`⚙️ ${mKey} started PACKING`, 'info');
+                        } else {
+                            m.state = 'IDLE';
+                            addLog(`📦 ${mKey} PACKED Batch #${m.currentBatchId}`, 'success');
+                            
+                            let t = m.timings[m.currentBatchId];
+                            let totalProcessTime;
+                            let isFirst = false;
+                            
+                            if (m.currentBatchId === 1) {
+                                totalProcessTime = simTimeElapsed - t.infeedStart;
+                                isFirst = true;
+                            } else {
+                                totalProcessTime = simTimeElapsed - t.outfeedStart;
+                            }
+                                
+                            addReport(mKey, m.currentBatchId, totalProcessTime, isFirst);
+                            m.currentBatchId = null;
                         }
                     }
                 }
+            });
+
+            // 3. Lift Interlock Physics
+            let isLiftExitBlocked = bags.some(b => 
+                (b.stage === 'convey' || b.stage === 'wait_unload') && 
+                (b.pos < BAG_LENGTH) // ถ้ามีถุงจอดอุดอยู่ที่หน้าลิฟต์พอดี (ระยะ < 0.95m)
+            );
+            
+            // ลิฟต์จะหยุดหมุนทันทีถ้าทางออกโดนบล็อค
+            let isLiftMoving = !isLiftExitBlocked; 
+
+            if (isLiftMoving) {
+                liftCycle = (liftCycle + (SPEED_LIFT * dtMin)) % TRAY_SPACING;
             }
+            const isTrayAligned = (liftCycle < 0.2 || liftCycle > 1.8);
 
-            // 3. Lift & Physics Update
-            liftCyclePos = (liftCyclePos + (P.liftSpd * dt)) % TRAY_SPACING;
-            const isTraySync = (liftCyclePos < 0.2 || liftCyclePos > 1.8);
-            stats.qLift = 0;
-            pusherExt = Math.max(0, pusherExt - (dt * 5)); // Retract pusher
+            const outRate1 = parseFloat(document.getElementById('outPM1Rate').value);
+            const outRate5 = parseFloat(document.getElementById('outPM5Rate').value);
 
-            for (let i = 0; i < bags.length; i++) {
+            // 4. Update Bags Position
+            for(let i=0; i<bags.length; i++) {
                 let b = bags[i];
-
-                if (b.stage === 'convey') {
-                    // Collision detection along the continuous path length
-                    let maxPos = 999;
-                    if (b.pos < PATH.InfeedEnd) maxPos = PATH.InfeedEnd;
-                    else if (b.type === 'PM1') maxPos = PATH.PM1End;
-                    else maxPos = PATH.PM5End;
-
-                    for (let j = 0; j < bags.length; j++) {
-                        let obj = bags[j];
-                        if (i !== j && obj.stage === 'convey') {
-                            // Only collide if on the same logical path segment
-                            let samePath = false;
-                            if (b.pos < PATH.A4End && obj.pos < PATH.A4End) samePath = true; // Shared path (A1-A4)
-                            else if (b.type === obj.type) samePath = true; // Specific paths A5 or A6-A8
-
-                            if (samePath && obj.pos > b.pos) {
-                                maxPos = Math.min(maxPos, obj.pos - 0.7); // 0.7m bag physical spacing
+                let m = machines[b.type];
+                
+                if(b.stage === 'infeed') {
+                    let maxPos = PATH.InfeedEnd;
+                    for (let other of bags) {
+                        if (other !== b && (other.stage === 'infeed' || other.stage === 'wait_lift') && other.pos > b.pos) {
+                            maxPos = Math.min(maxPos, other.pos - BAG_LENGTH);
+                        }
+                    }
+                    b.pos += SPEED_CV * dtMin;
+                    if(b.pos >= maxPos) b.pos = maxPos;
+                    if(b.pos >= PATH.InfeedEnd) {
+                        b.pos = PATH.InfeedEnd;
+                        b.stage = 'wait_lift';
+                    }
+                }
+                else if (b.stage === 'wait_lift') {
+                    let isFront = !bags.some(other => other.stage === 'lifting' && other.pos < 1.0);
+                    if(isFront && isTrayAligned && isLiftMoving) {
+                        b.stage = 'lifting';
+                        b.pos = 0;
+                    }
+                }
+                else if (b.stage === 'lifting') {
+                    if (isLiftMoving) {
+                        b.pos += SPEED_LIFT * dtMin;
+                    }
+                    if(b.pos >= PATH.LiftLen) {
+                        if (!isLiftExitBlocked) {
+                            b.pos = 0;
+                            b.stage = 'convey';
+                        } else {
+                            b.pos = PATH.LiftLen; 
+                        }
+                    }
+                }
+                else if (b.stage === 'convey') {
+                    let totalLen = b.type === 'PM1' ? PATH.PM1End : PATH.PM5End;
+                    let maxPos = totalLen;
+                    
+                    for(let other of bags) {
+                        if(other !== b && (other.stage === 'convey' || other.stage === 'wait_unload')) {
+                            if (b.type === other.type) {
+                                if (other.pos > b.pos) maxPos = Math.min(maxPos, other.pos - BAG_LENGTH);
+                            } else {
+                                if (other.pos > b.pos && (other.pos - BAG_LENGTH) < PATH.A4End) {
+                                    maxPos = Math.min(maxPos, other.pos - BAG_LENGTH);
+                                }
                             }
                         }
                     }
 
-                    b.pos += P.cvSpd * dt;
-                    if (b.pos >= maxPos) b.pos = maxPos; // Blocked
-
-                    // Transitions
-                    if (b.pos === PATH.InfeedEnd) {
-                        b.stage = 'wait_lift';
-                        b.waitStart = simTimeSec;
-                    } else if ((b.type === 'PM1' && b.pos >= PATH.PM1End) || (b.type === 'PM5' && b.pos >= PATH.PM5End)) {
+                    b.pos += SPEED_CV * dtMin;
+                    if(b.pos >= maxPos) b.pos = maxPos;
+                    
+                    if(b.pos >= totalLen) {
+                        b.pos = totalLen;
                         b.stage = 'wait_unload';
                     }
-
-                    // Sorter Trigger Visuals
-                    if (b.type === 'PM5' && b.pos > PATH.A3End && b.pos < PATH.A4End) {
-                        pusherExt = 1.0; 
-                    }
-                } 
-                else if (b.stage === 'wait_lift') {
-                    stats.qLift++;
-                    // Front of queue check
-                    const isFront = !bags.some(o => o.stage === 'lifting' && o.pos < 1.0);
-                    if (isFront && isTraySync) {
-                        b.stage = 'lifting';
-                        b.pos = 0; // reset for lift height (0-6m)
-                        const waitT = simTimeSec - b.waitStart;
-                        stats.waitTimes.push(waitT);
-                        if(stats.waitTimes.length > 5) stats.waitTimes.shift();
-                        if(activeBatch && b.batchId === activeBatch.id) activeBatch.waitTimeSec += waitT;
-                    }
-                } 
-                else if (b.stage === 'lifting') {
-                    b.pos += P.liftSpd * dt;
-                    if (b.pos >= DIST.LIFT) {
-                        b.stage = 'convey';
-                        b.pos = PATH.InfeedEnd; // Resume path at 4.41
-                    }
                 }
-            }
-
-            // Update UI Stats
-            document.getElementById('stQLift').innerText = `คิวหน้าลิฟต์: ${stats.qLift} ถุง`;
-            if (stats.waitTimes.length > 0) {
-                const avg = stats.waitTimes.reduce((a,b)=>a+b,0) / stats.waitTimes.length;
-                document.getElementById('stWait').innerText = `รอถาดลิฟต์เฉลี่ย: ${avg.toFixed(1)}s`;
-            }
-
-            // 4. Machine Processing Logic (Unload -> Mix -> Pack -> Done)
-            const processMachine = (mType, M, rate, mixT, packT) => {
-                if (M.state === 'unloading') {
-                    // Find bag waiting at end
-                    let targetBagIdx = bags.findIndex(b => b.stage === 'wait_unload' && b.type === mType);
-                    if (targetBagIdx !== -1) {
-                        M.timer += dt;
-                        if (M.timer >= (1 / rate)) {
-                            M.timer = 0;
-                            bags.splice(targetBagIdx, 1); // Remove bag
-                            M.count++;
-                            if (activeBatch) {
-                                if(mType === 'PM1') activeBatch.donePM1++; else activeBatch.donePM5++;
+                else if (b.stage === 'wait_unload') {
+                    if(m.state === 'IDLE' || m.state === 'UNLOADING') {
+                        if(m.state === 'IDLE' && m.currentBatchId === null) {
+                            m.state = 'UNLOADING';
+                            m.currentBatchId = b.batchId;
+                            m.currentBatchTotal = b.batchTotal; 
+                            m.q = 0;
+                            
+                            // Record Outfeed Start time for Batch 2+
+                            if (!m.timings[b.batchId]) m.timings[b.batchId] = {};
+                            m.timings[b.batchId].outfeedStart = simTimeElapsed;
+                            
+                            m.ulTimer = 1 / (b.type === 'PM1' ? outRate1 : outRate5); 
+                        }
+                        
+                        if(m.currentBatchId === b.batchId && m.state === 'UNLOADING') {
+                            m.ulTimer -= dtMin;
+                            if(m.ulTimer <= 0) {
+                                b.stage = 'done';
+                                m.q++;
+                                if(b.type === 'PM1') stats.out1++; else stats.out5++;
+                                m.ulTimer = 1 / (b.type === 'PM1' ? outRate1 : outRate5);
                             }
                         }
                     }
-                    if (M.target > 0 && M.count >= M.target) {
-                        M.state = 'mixing';
-                        M.timer = 0;
-                        logMsg(`${mType} Unloaded ${M.target} bags. Start MIXING.`, mType.toLowerCase());
-                    } else if (M.target === 0) {
-                        M.state = 'idle'; // No target for this line
-                        if(activeBatch) {
-                            if(mType==='PM1') activeBatch.pm1State = 'done';
-                            if(mType==='PM5') activeBatch.pm5State = 'done';
-                        }
-                    }
-                } 
-                else if (M.state === 'mixing') {
-                    M.timer += dt;
-                    if (M.timer >= mixT) {
-                        M.state = 'packing';
-                        M.timer = 0;
-                        logMsg(`${mType} Mixing Done. Start PACKING.`, mType.toLowerCase());
+                }
+            }
+
+            bags = bags.filter(b => b.stage !== 'done');
+            
+            ['PM1', 'PM5'].forEach(mKey => {
+                let m = machines[mKey];
+                if(m.state === 'UNLOADING') {
+                    if(m.q >= m.currentBatchTotal) {
+                        m.state = 'MIXING';
+                        m.timer = parseFloat(document.getElementById(mKey.toLowerCase()+'MixT').value);
+                        addLog(`🚚 ${mKey} Unloaded Batch #${m.currentBatchId}`, 'info');
+                        addLog(`🔄 ${mKey} started MIXING`, 'warn');
                     }
                 }
-                else if (M.state === 'packing') {
-                    M.timer += dt;
-                    if (M.timer >= packT) {
-                        M.state = 'idle';
-                        logMsg(`${mType} Batch Finished!`, 'success');
-                        if(activeBatch) {
-                            if(mType==='PM1') activeBatch.pm1State = 'done';
-                            if(mType==='PM5') activeBatch.pm5State = 'done';
-                        }
-                    }
-                }
-            };
+            });
 
-            processMachine('PM1', MACH.PM1, P.pm1Rate, P.m1Mix, P.m1Pack);
-            processMachine('PM5', MACH.PM5, P.pm5Rate, P.m5Mix, P.m5Pack);
+            document.getElementById('statIn1').innerText = stats.in1;
+            document.getElementById('statOut1').innerText = stats.out1;
+            document.getElementById('statIn5').innerText = stats.in5;
+            document.getElementById('statOut5').innerText = stats.out5;
 
-            // Time update
-            document.getElementById('stTime').innerText = formatTime(simTimeSec);
-
-            // Render Frame
-            renderGraphics();
+            draw();
             requestAnimationFrame(simLoop);
         }
 
-        // --- STREAMING_CHUNK: Rendering the Top-Down Canvas Graphics ---
-        const canvas = document.getElementById('simCanvas');
-        const ctx = canvas.getContext('2d');
-
-        // Coordinate Mapping based on CAD
-        const SCALE = 35; // Pixels per meter
-        const OFFSET_X = 50;
-        const OFFSET_Y = 350;
-
-        function renderGraphics() {
+        function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // ร่นพิกัดแกน Y ลงมา 100px เพื่อไม่ให้สายพาน A7 ทะลุขอบบน
+            const Y_LOWER = 680; 
+            const Y_UPPER = 430; 
+            
+            const xA1 = 80;
+            const xB1 = xA1 + (PATH.InfeedEnd * SCALE);
+            
+            const xA3 = xB1 + 60; 
+            const xA4 = xA3 + (PATH.A3End * SCALE);
+            
+            ctx.strokeStyle = '#1e293b'; ctx.setLineDash([5, 5]); ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(0, Y_LOWER+20); ctx.lineTo(canvas.width, Y_LOWER+20); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, Y_UPPER+20); ctx.lineTo(canvas.width, Y_UPPER+20); ctx.stroke();
+            ctx.setLineDash([]);
+            
+            ctx.fillStyle = '#64748b'; ctx.font = '14px Sarabun';
+            ctx.fillText('📍 ชั้นล่าง (Lower Level)', xA1 + 50, Y_LOWER - 30);
+            ctx.fillText('📍 ชั้นบน (Upper Level)', xA3 + 50, Y_UPPER - 30);
 
-            // 1. Draw Zones (CAD matching outlines)
-            ctx.lineWidth = 1; ctx.setLineDash([5, 5]);
-            // Pink zone (Infeed & Lift)
-            ctx.strokeStyle = '#ec4899'; ctx.strokeRect(30, 270, (DIST.A1_A2*SCALE)+60, 140);
-            // Green zone (PM1 Line)
-            ctx.strokeStyle = '#22c55e';
-            ctx.beginPath(); ctx.moveTo(OFFSET_X + DIST.A1_A2*SCALE, 270); 
-            ctx.lineTo(OFFSET_X + PATH.PM1End*SCALE, 270); ctx.lineTo(OFFSET_X + PATH.PM1End*SCALE, 440);
-            ctx.lineTo(OFFSET_X + DIST.A1_A2*SCALE, 440); ctx.closePath(); ctx.stroke();
-            // Red zone (PM5 Curve & Line)
-            ctx.strokeStyle = '#ef4444';
-            ctx.beginPath(); ctx.moveTo(OFFSET_X + PATH.A4End*SCALE, 270);
-            ctx.lineTo(OFFSET_X + PATH.A4End*SCALE, OFFSET_Y - (DIST.A6*SCALE) - (DIST.A7*SCALE));
-            ctx.lineTo(OFFSET_X + PATH.PM5End*SCALE, OFFSET_Y - (DIST.A6*SCALE) - (DIST.A7*SCALE));
-            ctx.lineTo(OFFSET_X + PATH.PM5End*SCALE, 270); ctx.closePath(); ctx.stroke();
+            // วาดสายพาน
+            ctx.lineWidth = 14; ctx.strokeStyle = '#475569'; ctx.lineCap = 'butt';
+            ctx.setLineDash([15, 10]);
+            
+            ctx.beginPath(); ctx.moveTo(xA1, Y_LOWER); ctx.lineTo(xB1, Y_LOWER); ctx.stroke();
+            
+            let pm1EndX = xA3 + (PATH.PM1End * SCALE);
+            ctx.beginPath(); ctx.moveTo(xA3, Y_UPPER); ctx.lineTo(pm1EndX, Y_UPPER); ctx.stroke();
+            
+            let pathA6Len = 3.19 * SCALE;
+            let R = 0.8 * SCALE; 
+            let cx = xA4 + R; 
+            let cy = Y_UPPER - pathA6Len;
+
+            ctx.beginPath(); 
+            ctx.moveTo(xA4, Y_UPPER); 
+            ctx.lineTo(xA4, cy); 
+            ctx.arc(cx, cy, R, Math.PI, 1.5 * Math.PI); 
+            let a8EndX = cx + (3.7 * SCALE);
+            ctx.lineTo(a8EndX, cy - R); 
+            ctx.stroke();
+            
+            ctx.setLineDash([]); 
+            
+            // Labels
+            ctx.fillStyle = '#94a3b8'; ctx.font = '12px sans-serif';
+            ctx.fillText(`S1 (In)`, xA1 + 10, Y_LOWER - 25);
+            ctx.fillText(`A1+A2 (Infeed 4.41m)`, xA1 + 20, Y_LOWER - 15);
+            ctx.fillText(`S2 (Wait)`, xB1 - 40, Y_LOWER - 25);
+            
+            ctx.fillText(`S3 (Clear)`, xA3 + 10, Y_UPPER - 25);
+            ctx.fillText(`A3 (2.3m)`, xA3 + 10, Y_UPPER - 15);
+            ctx.fillText(`S4 (Sort)`, xA4 - 30, Y_UPPER - 25);
+            
+            ctx.fillText(`A5 (PM1 4.2m)`, xA4 + 30, Y_UPPER - 15);
+            ctx.fillText(`S5 (PM1)`, pm1EndX - 30, Y_UPPER - 25);
+            
+            ctx.fillText(`A6 (3.19m)`, xA4 + 15, Y_UPPER - pathA6Len/2);
+            ctx.fillText(`A7 (R800)`, cx - R + 15, cy - R + 20);
+            ctx.fillText(`A8 (PM5 3.7m)`, cx + 50, cy - R - 15);
+            ctx.fillText(`S6 (PM5)`, a8EndX - 30, cy - R - 25);
+            
+            const drawSensor = (x, y, isActive) => {
+                ctx.fillStyle = isActive ? '#ef4444' : '#10b981'; 
+                ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI*2); ctx.fill();
+            };
+            const isBagAt = (posLimit, stage) => bags.some(b => b.stage === stage && b.pos >= posLimit - 0.5);
+
+            drawSensor(xA1 + 20, Y_LOWER - 15, isBagAt(0, 'infeed'));
+            drawSensor(xB1 - 20, Y_LOWER - 15, isBagAt(PATH.InfeedEnd, 'wait_lift'));
+            drawSensor(xA3 + 20, Y_UPPER - 15, isBagAt(0, 'convey'));
+            drawSensor(xA4 - 20, Y_UPPER - 15, isBagAt(PATH.A4End, 'convey'));
+            drawSensor(pm1EndX - 20, Y_UPPER - 15, bags.some(b => b.type==='PM1' && b.stage === 'wait_unload'));
+            drawSensor(a8EndX - 20, cy - R - 15, bags.some(b => b.type==='PM5' && b.stage === 'wait_unload'));
+
+            // Pusher
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(xA4-10, Y_UPPER + 10, 20, 10);
+            ctx.fillRect(xA4-5, Y_UPPER + 20, 10, 15);
+            ctx.fillText('A4 Pusher', xA4 - 20, Y_UPPER + 45);
+
+            // Lift Section View (ภาพตัดขวาง 6 ถาด)
+            let liftWidth = 60;
+            let liftTopY = Y_UPPER - 80;
+            let liftBotY = Y_LOWER + 50;
+            ctx.strokeStyle = '#0ea5e9'; ctx.lineWidth = 2;
+            ctx.strokeRect(xB1, liftTopY, liftWidth, liftBotY - liftTopY);
+            ctx.fillStyle = '#0ea5e9'; ctx.fillText(`B1 (Lift 6m)`, xB1, liftBotY + 15);
+            
+            ctx.strokeStyle = '#334155'; ctx.setLineDash([3,3]);
+            ctx.beginPath(); ctx.moveTo(xB1+30, liftTopY); ctx.lineTo(xB1+30, liftBotY); ctx.stroke();
             ctx.setLineDash([]);
 
-            // Helper to draw segment
-            const drawSeg = (name, x1, y1, x2, y2) => {
-                ctx.lineWidth = 16; ctx.strokeStyle = '#334155'; ctx.lineCap = 'butt';
-                ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-                // Belt dashes
-                ctx.lineWidth = 8; ctx.strokeStyle = '#475569'; ctx.setLineDash([10, 10]);
-                ctx.lineDashOffset = -(simTimeSec * (parseFloat(document.getElementById('setCvSpd').value)/60) * SCALE) % 20; 
-                ctx.stroke(); ctx.setLineDash([]);
-                ctx.fillStyle = '#94a3b8'; ctx.font = '10px Arial';
-                ctx.fillText(name, x1 + 10, y1 - 12);
+            ctx.fillStyle = '#38bdf8'; 
+            for(let i=0; i<=PATH.LiftLen; i+=TRAY_SPACING) {
+                let yPos = i - liftCycle;
+                if(yPos < 0) yPos += 12;
+                if(yPos <= PATH.LiftLen) {
+                    let drawY = Y_LOWER - (yPos / PATH.LiftLen) * (Y_LOWER - Y_UPPER);
+                    ctx.fillRect(xB1 + 5, drawY - 3, 20, 6);
+                }
+            }
+            ctx.fillStyle = '#475569'; 
+            for(let i=0; i<=PATH.LiftLen; i+=TRAY_SPACING) {
+                let yPos = i - liftCycle;
+                if(yPos < 0) yPos += 12;
+                if(yPos > PATH.LiftLen && yPos <= 12) {
+                    let downPos = 12 - yPos; 
+                    let drawY = Y_LOWER - (downPos / PATH.LiftLen) * (Y_LOWER - Y_UPPER);
+                    ctx.fillRect(xB1 + 35, drawY - 3, 20, 6);
+                }
+            }
+
+            const drawMachine = (name, x, y, color) => {
+                let m = machines[name];
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y - 40, 120, 80);
+                ctx.fillStyle = 'white'; ctx.font = 'bold 24px sans-serif';
+                ctx.fillText(name, x + 30, y + 10);
+                
+                ctx.fillStyle = m.state === 'IDLE' ? '#64748b' : 
+                               m.state === 'UNLOADING' ? '#10b981' : '#eab308';
+                ctx.fillRect(x, y + 40, 120, 30);
+                ctx.fillStyle = 'white'; ctx.font = 'bold 14px sans-serif';
+                
+                let text = m.state;
+                if(m.state === 'UNLOADING') {
+                    text += ` ${m.q}/${m.currentBatchTotal}`;
+                } else if(m.state !== 'IDLE') {
+                    let min = Math.floor(m.timer);
+                    let sec = Math.floor((m.timer - min)*60);
+                    text += ` ${min}:${sec.toString().padStart(2,'0')}`;
+                }
+                ctx.fillText(text, x + 10, y + 60);
             };
 
-            // Calculate Key coordinates
-            const cLIFT_X = OFFSET_X + DIST.A1_A2 * SCALE;
-            const cA4_X = cLIFT_X + (DIST.A3 * SCALE);
-            const cPM1_X = OFFSET_X + PATH.PM1End * SCALE;
-            
-            const cPM5_Y = OFFSET_Y - (DIST.A6 + DIST.A7) * SCALE;
-            const cA7_CX = cA4_X + (DIST.A7 * SCALE);
+            drawMachine('PM1', pm1EndX, Y_UPPER, '#2563eb');
+            drawMachine('PM5', a8EndX, cy - R, '#ea580c');
 
-            // Draw Segments
-            drawSeg('A1+A2 (Infeed 4.41m)', OFFSET_X, OFFSET_Y, cLIFT_X, OFFSET_Y);
-            drawSeg('A3 (2.3m)', cLIFT_X + 40, OFFSET_Y, cA4_X, OFFSET_Y);
-            drawSeg('A5 (PM1 4.2m)', cA4_X + 20, OFFSET_Y, cPM1_X, OFFSET_Y);
-            drawSeg('A6 (3.19m)', cA4_X + 10, OFFSET_Y - 10, cA4_X + 10, cPM5_Y + (DIST.A7*SCALE));
-            
-            // Curve A7
-            ctx.lineWidth = 16; ctx.strokeStyle = '#334155'; ctx.beginPath();
-            ctx.arc(cA7_CX, cPM5_Y + (DIST.A7*SCALE), DIST.A7*SCALE, Math.PI, 1.5 * Math.PI); ctx.stroke();
-            ctx.fillText('A7 (R800)', cA7_CX - 20, cPM5_Y + 10);
-
-            drawSeg('A8 (PM5 3.7m)', cA7_CX, cPM5_Y, cA7_CX + (DIST.A8*SCALE), cPM5_Y);
-
-            // Draw Sorter (A4 Pneumatic)
-            ctx.fillStyle = '#f43f5e';
-            ctx.fillRect(cA4_X - 5, OFFSET_Y + 10, 30, 8); // Base
-            let armLen = 10 + (pusherExt * 20);
-            ctx.fillRect(cA4_X + 5, OFFSET_Y + 10 - armLen, 10, armLen); // Rod
-            ctx.fillRect(cA4_X, OFFSET_Y + 10 - armLen - 4, 20, 4); // Pad
-            ctx.fillText('A4 Pusher', cA4_X - 10, OFFSET_Y + 30);
-
-            // Draw Lift B1 (Top Down Box)
-            ctx.fillStyle = '#0f172a'; ctx.fillRect(cLIFT_X, OFFSET_Y - 20, 40, 40);
-            ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2; ctx.strokeRect(cLIFT_X, OFFSET_Y - 20, 40, 40);
-            // Draw internal trays crossing
-            ctx.fillStyle = 'rgba(56, 189, 248, 0.2)';
-            let liftPhase = liftCyclePos / TRAY_SPACING; // 0 to 1
-            let trayVisH = 40 * liftPhase;
-            ctx.fillRect(cLIFT_X, OFFSET_Y + 20 - trayVisH, 40, 5);
-            ctx.fillStyle = '#38bdf8'; ctx.fillText('B1 (Lift 6m)', cLIFT_X - 10, OFFSET_Y + 35);
-
-            // Draw Machines
-            const drawMach = (x, y, name, color, data, target) => {
-                ctx.fillStyle = color; ctx.fillRect(x, y, 70, 70);
-                ctx.fillStyle = '#fff'; ctx.font = 'bold 16px Arial'; ctx.fillText(name, x+15, y+25);
-                
-                // Status Box
-                let stColor = '#64748b'; let txt = 'IDLE';
-                if(data.state==='unloading') { stColor = '#3b82f6'; txt = `LOAD ${data.count}/${target}`; }
-                else if(data.state==='mixing') { stColor = '#eab308'; txt = 'MIXING'; }
-                else if(data.state==='packing') { stColor = '#10b981'; txt = 'PACKING'; }
-                
-                ctx.fillStyle = stColor; ctx.fillRect(x, y+45, 70, 25);
-                ctx.fillStyle = '#fff'; ctx.font = '10px Arial'; ctx.fillText(txt, x+5, y+62);
-            };
-
-            const tP1 = activeBatch ? activeBatch.tPM1 : 0;
-            const tP5 = activeBatch ? activeBatch.tPM5 : 0;
-            drawMach(cPM1_X, OFFSET_Y - 35, 'PM1', '#1d4ed8', MACH.PM1, tP1);
-            drawMach(cA7_CX + (DIST.A8*SCALE), cPM5_Y - 35, 'PM5', '#c2410c', MACH.PM5, tP5);
-
-            // Draw Bags
-            for (let b of bags) {
+            bags.forEach(b => {
                 ctx.fillStyle = b.type === 'PM1' ? '#60a5fa' : '#fb923c';
-                ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
                 
-                let bX = 0, bY = 0;
+                let drawW = BAG_LENGTH * SCALE; 
+                let drawH = 22; 
+                let xCenter, yCenter, rotation = 0;
                 let isLifting = false;
 
-                if (b.stage === 'convey' || b.stage === 'wait_lift' || b.stage === 'wait_unload') {
-                    if (b.pos <= PATH.InfeedEnd) {
-                        bX = OFFSET_X + (b.pos * SCALE); bY = OFFSET_Y;
-                    } else if (b.pos <= PATH.A4End) {
-                        bX = OFFSET_X + (b.pos * SCALE) + 40; bY = OFFSET_Y; // +40 for lift offset
+                if (b.stage === 'infeed' || b.stage === 'wait_lift') {
+                    xCenter = xA1 + (b.pos * SCALE);
+                    yCenter = Y_LOWER;
+                } 
+                else if (b.stage === 'lifting') {
+                    xCenter = xB1 + 15;
+                    yCenter = Y_LOWER - (b.pos / PATH.LiftLen) * (Y_LOWER - Y_UPPER);
+                    isLifting = true;
+                } 
+                else if (b.stage === 'convey' || b.stage === 'wait_unload') {
+                    if (b.pos <= PATH.A4End) { 
+                        xCenter = xA3 + (b.pos * SCALE);
+                        yCenter = Y_UPPER;
                     } else {
-                        if (b.type === 'PM1') {
-                            bX = OFFSET_X + (b.pos * SCALE) + 40; bY = OFFSET_Y;
-                        } else {
-                            // PM5 Complex Path
-                            let relPos = b.pos - PATH.A4End;
-                            if (relPos <= DIST.A6) {
-                                bX = cA4_X + 10; bY = OFFSET_Y - (relPos * SCALE);
-                            } else if (relPos <= DIST.A6 + DIST.A7) {
-                                let curvePos = relPos - DIST.A6;
-                                let angle = Math.PI - ((curvePos / DIST.A7) * (Math.PI/2)); // PI to 0.5PI
-                                bX = cA7_CX + (DIST.A7*SCALE) * Math.cos(angle);
-                                bY = (cPM5_Y + DIST.A7*SCALE) - (DIST.A7*SCALE) * Math.sin(angle);
-                            } else {
-                                let lastPos = relPos - DIST.A6 - DIST.A7;
-                                bX = cA7_CX + (lastPos * SCALE); bY = cPM5_Y;
+                        if (b.type === 'PM1') { 
+                            let dist = b.pos - PATH.A4End;
+                            xCenter = xA4 + (dist * SCALE);
+                            yCenter = Y_UPPER;
+                        } else { 
+                            let dist = b.pos - PATH.A4End;
+                            if (dist <= 3.19) { 
+                                xCenter = xA4;
+                                yCenter = Y_UPPER - (dist * SCALE);
+                                rotation = -Math.PI / 2;
+                            } else if (dist <= 3.19 + 1.25) { 
+                                // โค้ง A7 คำนวณ Tangent องศาให้ถุงสไลด์ตัวเนียนๆ
+                                let arcDist = dist - 3.19;
+                                let arcRatio = arcDist / 1.25;
+                                let angle = Math.PI + (arcRatio * Math.PI / 2); 
+                                xCenter = cx + R * Math.cos(angle);
+                                yCenter = cy + R * Math.sin(angle);
+                                rotation = angle + (Math.PI / 2);
+                            } else { 
+                                let dist8 = dist - (3.19 + 1.25);
+                                xCenter = cx + (dist8 * SCALE);
+                                yCenter = cy - R;
+                                rotation = 0;
                             }
                         }
                     }
-                } else if (b.stage === 'lifting') {
-                    bX = cLIFT_X + 20; bY = OFFSET_Y; isLifting = true;
                 }
+                
+                if (xCenter !== undefined && yCenter !== undefined) {
+                    ctx.save();
+                    ctx.translate(xCenter, yCenter);
+                    ctx.rotate(rotation);
 
-                ctx.save();
-                ctx.translate(bX, bY);
-                // Rotate bag on curve or A6
-                if(b.type === 'PM5' && b.pos > PATH.A4End) {
-                    let r = b.pos - PATH.A4End;
-                    if (r <= DIST.A6) ctx.rotate(-Math.PI/2);
-                    else if (r <= DIST.A6 + DIST.A7) {
-                        let ang = Math.PI - (((r - DIST.A6) / DIST.A7) * (Math.PI/2));
-                        ctx.rotate(ang);
+                    if (isLifting) {
+                        drawW = 24; drawH = 16; 
+                        ctx.fillRect(-drawW/2, -drawH/2, drawW, drawH);
+                        ctx.strokeRect(-drawW/2, -drawH/2, drawW, drawH);
+                        ctx.fillStyle = 'white'; ctx.font='10px sans-serif';
+                        ctx.fillText(`⬆ ${b.pos.toFixed(1)}m`, drawW, 4);
+                    } else {
+                        ctx.fillRect(-drawW/2, -drawH/2, drawW, drawH);
+                        ctx.strokeRect(-drawW/2, -drawH/2, drawW, drawH);
+                        ctx.fillStyle = 'black'; ctx.font = '12px bold sans-serif';
+                        ctx.fillText(`B${b.batchId}`, -10, 4);
                     }
+                    
+                    ctx.restore();
                 }
-
-                ctx.beginPath(); ctx.roundRect(-8, -6, 16, 12, 2); ctx.fill();
-                ctx.fillStyle = '#fff'; ctx.fillRect(-2, -2, 4, 4); // QR
-                ctx.restore();
-                ctx.shadowBlur = 0;
-
-                // Lift height tag
-                if(isLifting) {
-                    ctx.fillStyle = '#fff'; ctx.font = 'bold 10px Arial';
-                    ctx.fillText(`⬆ ${b.pos.toFixed(1)}m`, bX - 15, bY - 15);
-                }
-            }
+            });
         }
 
-        // Render initial static frame
-        renderGraphics();
+        draw();
+        updateQueueUI();
     </script>
 </body>
 </html>
