@@ -362,17 +362,17 @@
             if (logBox.children.length > 20) logBox.lastElementChild.remove();
         }
 
-        // --- Conveyor Network Mapping ---
-        // We separate Physical Length (for math) from Visual coordinates (for drawing)
+        // --- Conveyor Network Mapping (Top-Down Scaled to match CAD drawing) ---
+        // 1 Meter = ~45 pixels for accurate visual scaling
         const C = {
-            A1_A2: { id: 'A1_A2', name: 'Infeed A1+A2', length: 15.0, speed: 15, visualStart: {x: 50, y: 350}, visualEnd: {x: 300, y: 350} },
-            B1:    { id: 'B1', name: 'Vertical Lift B1', length: 6.0, speed: 20, visualStart: {x: 300, y: 350}, visualEnd: {x: 300, y: 150} },
-            A3:    { id: 'A3', name: 'Outfeed A3', length: 2.3, speed: 20, visualStart: {x: 300, y: 150}, visualEnd: {x: 420, y: 150} },
-            A4:    { id: 'A4', name: 'Pusher Sorter A4', length: 0.5, speed: 20, visualStart: {x: 420, y: 150}, visualEnd: {x: 450, y: 150}, isSorter: true },
-            A5:    { id: 'A5', name: 'PM1 Line A5', length: 4.2, speed: 20, visualStart: {x: 450, y: 150}, visualEnd: {x: 650, y: 150} },
-            A6:    { id: 'A6', name: 'PM5 Branch A6', length: 3.2, speed: 20, visualStart: {x: 420, y: 150}, visualEnd: {x: 420, y: 250} },
-            A7:    { id: 'A7', name: 'Curve A7', length: 1.25, speed: 20, visualStart: {x: 420, y: 250}, visualEnd: {x: 470, y: 300} },
-            A8:    { id: 'A8', name: 'PM5 Line A8', length: 3.7, speed: 20, visualStart: {x: 470, y: 300}, visualEnd: {x: 650, y: 300} }
+            A1_A2: { id: 'A1_A2', name: 'Infeed A1+A2', length: 4.41, speed: 15, visualStart: {x: 100, y: 350}, visualEnd: {x: 298, y: 350} },
+            B1:    { id: 'B1', name: 'Vertical Lift B1', length: 6.0, speed: 20, visualStart: {x: 298, y: 310}, visualEnd: {x: 364, y: 390} }, // Box bounds
+            A3:    { id: 'A3', name: 'Outfeed A3', length: 2.31, speed: 20, visualStart: {x: 364, y: 350}, visualEnd: {x: 467, y: 350} },
+            A4:    { id: 'A4', name: 'Sorter A4', length: 0.64, speed: 20, visualStart: {x: 467, y: 350}, visualEnd: {x: 495, y: 350} }, 
+            A5:    { id: 'A5', name: 'PM1 Line A5', length: 4.20, speed: 20, visualStart: {x: 495, y: 350}, visualEnd: {x: 684, y: 350} },
+            A6:    { id: 'A6', name: 'PM5 Branch A6', length: 3.19, speed: 20, visualStart: {x: 481, y: 335}, visualEnd: {x: 481, y: 191} },
+            A7:    { id: 'A7', name: 'Curve A7', length: 1.25, speed: 20, visualCenter: {x: 517, y: 191}, radius: 36 },
+            A8:    { id: 'A8', name: 'PM5 Line A8', length: 3.70, speed: 20, visualStart: {x: 517, y: 155}, visualEnd: {x: 683, y: 155} }
         };
 
         // Network Routing Rules
@@ -388,12 +388,12 @@
         };
 
         const Sensors = {
-            S1: { x: 70, y: 350, state: 0, label: 'PE-1 (Check-in)' },
+            S1: { x: 120, y: 350, state: 0, label: 'PE-1 (Check-in)' },
             S2: { x: 280, y: 350, state: 0, label: 'PE-2 (Lift In)' },
-            S3: { x: 320, y: 150, state: 0, label: 'PE-3 (Lift Out)' },
-            S4: { x: 410, y: 150, state: 0, label: 'PE-4 (Sorter)' },
-            S5: { x: 630, y: 150, state: 0, label: 'PE-5 (PM1 Out)' },
-            S6: { x: 630, y: 300, state: 0, label: 'PE-6 (PM5 Out)' }
+            S3: { x: 380, y: 350, state: 0, label: 'PE-3 (Lift Out)' },
+            S4: { x: 450, y: 350, state: 0, label: 'PE-4 (Sorter)' },
+            S5: { x: 650, y: 350, state: 0, label: 'PE-5 (PM1 Out)' },
+            S6: { x: 650, y: 155, state: 0, label: 'PE-6 (PM5 Out)' }
         };
 
         let bags = [];
@@ -724,12 +724,12 @@
                 }
 
                 // Sensor Triggers based on distance
-                if (b.segment === 'A1_A2' && b.progress > 14 && b.progress < 14.5) Sensors.S2.state = 1;
+                if (b.segment === 'A1_A2' && b.progress > 0.2 && b.progress < 0.6) Sensors.S1.state = 1;
+                if (b.segment === 'A1_A2' && b.progress > 3.9 && b.progress < 4.4) Sensors.S2.state = 1;
                 if (b.segment === 'A3' && b.progress > 0.1 && b.progress < 0.5) Sensors.S3.state = 1;
-                if (b.segment === 'A3' && b.progress > 2.0) Sensors.S4.state = 1;
-                // Full line sensors (stay green if bag is stuck there)
-                if (b.segment === 'A5' && b.progress > 3.4) Sensors.S5.state = 1; 
-                if (b.segment === 'A8' && b.progress > 2.9) Sensors.S6.state = 1;
+                if (b.segment === 'A4') Sensors.S4.state = 1;
+                if (b.segment === 'A5' && b.progress > 3.7) Sensors.S5.state = 1; 
+                if (b.segment === 'A8' && b.progress > 3.2) Sensors.S6.state = 1;
 
                 // Segment Transition
                 if (b.progress >= seg.length) {
@@ -914,117 +914,116 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+            // 1. Draw Zones (CAD matching outlines)
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            
+            // Pink zone (Infeed & Lift)
+            ctx.strokeStyle = '#ec4899'; 
+            ctx.strokeRect(50, 270, 325, 140);
+            
+            // Green zone (PM1 & Sorting)
+            ctx.strokeStyle = '#22c55e';
+            ctx.beginPath();
+            ctx.moveTo(375, 270); ctx.lineTo(430, 270); ctx.lineTo(430, 210); ctx.lineTo(760, 210);
+            ctx.lineTo(760, 440); ctx.lineTo(375, 440); ctx.closePath(); ctx.stroke();
+            
+            // Red zone (PM5 Curve & Line)
+            ctx.strokeStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.moveTo(430, 210); ctx.lineTo(430, 90); ctx.lineTo(760, 90);
+            ctx.lineTo(760, 210); ctx.closePath(); ctx.stroke();
+            
+            ctx.setLineDash([]);
+
             // Draw Conveyor Segments
             for (let key in C) {
                 let seg = C[key];
+                if (key === 'B1') continue; // Draw lift separately
                 
-                ctx.lineWidth = 14;
+                ctx.lineWidth = 18;
                 ctx.strokeStyle = '#475569'; // Track color
-                ctx.lineCap = 'round';
+                ctx.lineCap = 'butt';
                 
                 ctx.beginPath();
-                ctx.moveTo(seg.visualStart.x, seg.visualStart.y);
-                
-                // If it's the curve A7, draw a curve
                 if (key === 'A7') {
-                    // Quadratic curve for 90 deg turn
-                    ctx.quadraticCurveTo(seg.visualStart.x, seg.visualEnd.y, seg.visualEnd.x, seg.visualEnd.y);
+                    // Curve A7
+                    ctx.arc(seg.visualCenter.x, seg.visualCenter.y, seg.radius, Math.PI, 1.5 * Math.PI);
                 } else {
+                    ctx.moveTo(seg.visualStart.x, seg.visualStart.y);
                     ctx.lineTo(seg.visualEnd.x, seg.visualEnd.y);
                 }
                 ctx.stroke();
 
                 // Draw moving belt effect
-                ctx.lineWidth = 8;
+                ctx.lineWidth = 12;
                 ctx.strokeStyle = '#64748b';
                 ctx.setLineDash([10, 10]);
-                // Animate dash offset based on time and speed
                 let dashOffset = -(performance.now() / 50) * (seg.speed / 20); 
                 ctx.lineDashOffset = dashOffset;
                 ctx.stroke();
                 ctx.setLineDash([]); // Reset
                 
-                // Labels
+                // Dimensions & Labels
                 ctx.fillStyle = '#94a3b8';
                 ctx.font = '10px Arial';
-                ctx.fillText(seg.name, seg.visualStart.x + 10, seg.visualStart.y - 15);
-            }
-
-            // Draw Lift Mechanism (B1)
-            ctx.fillStyle = '#334155';
-            ctx.fillRect(C.B1.visualStart.x - 20, C.B1.visualEnd.y - 10, 40, C.B1.visualStart.y - C.B1.visualEnd.y + 20);
-            ctx.strokeStyle = '#38bdf8';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(C.B1.visualStart.x - 20, C.B1.visualEnd.y - 10, 40, C.B1.visualStart.y - C.B1.visualEnd.y + 20);
-            
-            // Draw Moving Trays in Lift (6-Tray System)
-            ctx.fillStyle = 'rgba(56, 189, 248, 0.4)'; // Light blue trays
-            let liftVisualHeight = C.B1.visualStart.y - C.B1.visualEnd.y;
-            let pixelsPerMeter = liftVisualHeight / C.B1.length;
-            for(let i=0; i<=C.B1.length; i+=TRAY_SPACING) {
-                let yPosMeters = i - liftCycle;
-                if(yPosMeters < 0) yPosMeters += 12; // 12m total loop
-                if(yPosMeters <= C.B1.length) {
-                    let drawY = C.B1.visualStart.y - (yPosMeters * pixelsPerMeter);
-                    ctx.fillRect(C.B1.visualStart.x - 18, drawY - 4, 36, 8);
+                if (key !== 'A7') {
+                    ctx.fillText(`${seg.name} (${seg.length}m)`, seg.visualStart.x + 10, seg.visualStart.y - 12);
                 }
             }
 
+            // Draw Lift Mechanism (B1) Top-Down Box
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(C.B1.visualStart.x, C.B1.visualStart.y, C.B1.visualEnd.x - C.B1.visualStart.x, C.B1.visualEnd.y - C.B1.visualStart.y);
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(C.B1.visualStart.x, C.B1.visualStart.y, C.B1.visualEnd.x - C.B1.visualStart.x, C.B1.visualEnd.y - C.B1.visualStart.y);
+            
+            // Draw internal lift cross/texture
+            ctx.beginPath(); ctx.moveTo(C.B1.visualStart.x, C.B1.visualStart.y); ctx.lineTo(C.B1.visualEnd.x, C.B1.visualEnd.y); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(C.B1.visualEnd.x, C.B1.visualStart.y); ctx.lineTo(C.B1.visualStart.x, C.B1.visualEnd.y); ctx.stroke();
+            
             ctx.fillStyle = '#38bdf8';
-            ctx.fillText('LIFT UP 6M', C.B1.visualStart.x - 25, C.B1.visualStart.y + 20);
+            ctx.fillText(`Lift B1 (6m)`, C.B1.visualStart.x + 5, C.B1.visualEnd.y + 15);
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillText(`1480x1095 mm`, C.B1.visualStart.x - 5, C.B1.visualEnd.y + 30);
 
-            // Draw Pusher (A4)
-            const pX = C.A4.visualStart.x;
-            const pY = C.A4.visualStart.y;
+            // Draw Pusher (A4) - Pneumatic arm from bottom
+            const pX = 481;
+            const pY = 365;
             ctx.fillStyle = '#f43f5e';
-            // Pusher base
-            ctx.fillRect(pX + 5, pY - 25, 20, 10);
-            // Pusher arm (animated)
+            ctx.fillRect(pX - 10, pY, 20, 10); // Base
             let armLen = 10 + (pusherExtend * 15);
-            ctx.fillRect(pX + 13, pY - 15, 4, armLen);
-            ctx.fillRect(pX + 5, pY - 15 + armLen, 20, 4); // Pad
+            ctx.fillRect(pX - 2, pY - armLen, 4, armLen); // Rod
+            ctx.fillRect(pX - 10, pY - armLen - 4, 20, 4); // Pad
 
-            // Draw Destinations
+            // Draw Destinations (Machines)
             ctx.fillStyle = '#2563eb'; // PM1
-            ctx.fillRect(C.A5.visualEnd.x, C.A5.visualEnd.y - 30, 60, 60);
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 14px Arial';
-            ctx.fillText('PM 1', C.A5.visualEnd.x + 12, C.A5.visualEnd.y + 5);
+            ctx.fillRect(684, 320, 60, 60);
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 14px Arial';
+            ctx.fillText('PM 1', 695, 355);
 
             ctx.fillStyle = '#ea580c'; // PM5
-            ctx.fillRect(C.A8.visualEnd.x, C.A8.visualEnd.y - 30, 60, 60);
+            ctx.fillRect(683, 125, 60, 60);
             ctx.fillStyle = '#fff';
-            ctx.fillText('PM 5', C.A8.visualEnd.x + 12, C.A8.visualEnd.y + 5);
+            ctx.fillText('PM 5', 695, 160);
 
             // Draw Sensors
             for (let key in Sensors) {
                 let s = Sensors[key];
-                // Base
                 ctx.fillStyle = '#1e293b';
-                ctx.beginPath();
-                ctx.arc(s.x, s.y - 15, 6, 0, Math.PI*2);
-                ctx.fill();
-                ctx.strokeStyle = '#475569';
-                ctx.lineWidth = 2;
-                ctx.stroke();
+                ctx.beginPath(); ctx.arc(s.x, s.y - 15, 6, 0, Math.PI*2); ctx.fill();
+                ctx.strokeStyle = '#475569'; ctx.lineWidth = 2; ctx.stroke();
                 
-                // LED
                 if (s.state > 0) {
-                    ctx.fillStyle = '#10b981'; // Green active
-                    ctx.shadowColor = '#10b981';
-                    ctx.shadowBlur = 10;
+                    ctx.fillStyle = '#10b981'; ctx.shadowColor = '#10b981'; ctx.shadowBlur = 10;
                 } else {
-                    ctx.fillStyle = '#ef4444'; // Red idle
-                    ctx.shadowColor = 'transparent';
-                    ctx.shadowBlur = 0;
+                    ctx.fillStyle = '#ef4444'; ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
                 }
-                ctx.beginPath();
-                ctx.arc(s.x, s.y - 15, 3, 0, Math.PI*2);
-                ctx.fill();
-                ctx.shadowBlur = 0; // reset
+                ctx.beginPath(); ctx.arc(s.x, s.y - 15, 3, 0, Math.PI*2); ctx.fill();
+                ctx.shadowBlur = 0;
                 
-                ctx.fillStyle = '#cbd5e1';
-                ctx.font = '9px Arial';
+                ctx.fillStyle = '#cbd5e1'; ctx.font = '9px Arial';
                 ctx.fillText(s.label, s.x - 15, s.y - 25);
             }
 
@@ -1032,19 +1031,19 @@
             for (let b of bags) {
                 let seg = C[b.segment];
                 let ratio = b.progress / seg.length;
-                
                 let bX, bY;
+                let isLifting = false;
 
                 if (b.segment === 'A7') {
-                    // Curve calculation
-                    // Quadratic curve visual matching from (420,250) to (470,300) with control (420,300)
-                    let p0 = seg.visualStart;
-                    let p1 = { x: seg.visualStart.x, y: seg.visualEnd.y };
-                    let p2 = seg.visualEnd;
-                    
-                    let inv = 1 - ratio;
-                    bX = inv * inv * p0.x + 2 * inv * ratio * p1.x + ratio * ratio * p2.x;
-                    bY = inv * inv * p0.y + 2 * inv * ratio * p1.y + ratio * ratio * p2.y;
+                    // Curve math for R800
+                    let angle = Math.PI + (ratio * (Math.PI / 2));
+                    bX = seg.visualCenter.x + seg.radius * Math.cos(angle);
+                    bY = seg.visualCenter.y + seg.radius * Math.sin(angle);
+                } else if (b.segment === 'B1') {
+                    // Inside Lift - center it and show altitude
+                    bX = 331; 
+                    bY = 350;
+                    isLifting = true;
                 } else {
                     // Linear interpolation
                     bX = seg.visualStart.x + ratio * (seg.visualEnd.x - seg.visualStart.x);
@@ -1052,18 +1051,38 @@
                 }
 
                 ctx.fillStyle = b.type === 'PM1' ? '#3b82f6' : '#f97316';
-                ctx.shadowColor = 'rgba(0,0,0,0.5)';
-                ctx.shadowBlur = 4;
+                ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 4;
+                
+                ctx.save();
+                ctx.translate(bX, bY);
+                // Rotate bag correctly along curve and PM5 branch
+                if (b.segment === 'A7') {
+                    let angle = Math.PI + (ratio * (Math.PI / 2));
+                    ctx.rotate(angle + Math.PI/2); 
+                } else if (b.segment === 'A6') {
+                    ctx.rotate(-Math.PI/2);
+                }
+
                 ctx.beginPath();
-                ctx.roundRect(bX - 10, bY - 8, 20, 16, 2);
+                ctx.roundRect(-10, -8, 20, 16, 2);
                 ctx.fill();
-                ctx.shadowBlur = 0;
                 
                 // QR Detail
-                ctx.fillStyle = '#fff';
-                ctx.fillRect(bX - 2, bY - 2, 4, 4);
+                ctx.fillStyle = '#fff'; ctx.fillRect(-2, -2, 4, 4);
+                ctx.restore();
+                ctx.shadowBlur = 0;
+
+                // Draw Lift Height Tag if in B1
+                if(isLifting) {
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 10px Arial';
+                    ctx.fillText(`⬆ ${b.progress.toFixed(1)}m`, bX - 12, bY - 12);
+                }
             }
         }
+
+        // Main Loop
+        function loop(time) {
 
         // Main Loop
         function loop(time) {
