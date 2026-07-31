@@ -193,7 +193,7 @@
                 </div>
             </div>
 
-            <!-- 2. NEW: Production Run Summary Cards -->
+            <!-- 2. Production Run Summary Cards -->
             <div class="grid grid-cols-2 gap-4">
                 <div class="bg-slate-800/80 rounded-lg border border-slate-700 p-3 shadow-md flex justify-between items-center border-l-4 border-l-blue-500">
                     <div>
@@ -261,7 +261,7 @@
         let SPEED_CV = 20; 
         let SPEED_LIFT = 15; 
 
-        // ขนาดถุงตามความจริง (ยาว 90cm + gap ป้องกันชน = 95cm)
+        // ขนาดถุง 90cm + gap 5cm
         const BAG_LENGTH = 0.95; 
         const TRAY_SPACING = 2.0; 
         
@@ -291,7 +291,6 @@
 
         let stats = { in1: 0, out1: 0, in5: 0, out5: 0 };
         
-        // NEW: Total Simulation Run Stats
         let runStats = {
             'PM1': { batches: 0, firstStart: null, totalTime: 0 },
             'PM5': { batches: 0, firstStart: null, totalTime: 0 }
@@ -321,13 +320,11 @@
             activeInfeed = { 'PM1': null, 'PM5': null };
             batchCounters = { 'PM1': 1, 'PM5': 1 };
             
-            // ล้างข้อมูลการคำนวณทั้งหมดของการ Simulate รอบนี้
             runStats = {
                 'PM1': { batches: 0, firstStart: null, totalTime: 0 },
                 'PM5': { batches: 0, firstStart: null, totalTime: 0 }
             };
             updateRunStatsUI();
-            
             updateQueueUI();
             addLog("🗑️ ล้างคิวการผลิต และ รีเซ็ตข้อมูลสรุปเวลา", "warn");
         }
@@ -449,27 +446,25 @@
             lastTime = timestamp;
             simTimeElapsed += dtMin;
 
-            // 1. ดึงคิวเข้าสู่ Infeed Process แยกขาดจากสถานะเครื่องจักร
+            // 1. ดึงคิวเข้าสู่ Infeed 
             ['PM1', 'PM5'].forEach(type => {
                 if (!activeInfeed[type] && queues[type].length > 0) {
                     const runMode = document.getElementById('runMode').value;
                     let canStart = true;
                     if (runMode === 'wait') {
-                        // โหมดทีละ Batch จะรอจนกว่าเครื่องของตัวเองจะว่างและไม่มีถุงบนสายพาน
                         if (machines[type].state !== 'IDLE' || bags.some(b => b.type === type)) {
                             canStart = false;
                         }
                     }
                     if (canStart) {
                         activeInfeed[type] = queues[type].shift();
-                        
                         addLog(`👨‍🔧 Infeed เริ่มเตรียมเท ${type} Batch #${activeInfeed[type].id}`);
                         updateQueueUI();
                     }
                 }
             });
 
-            // 2. คนป้อนสินค้า (Alternating logic) สลับเททีละถุงระหว่าง PM1 และ PM5
+            // 2. คนป้อนสินค้า (Alternating logic)
             let typeToFeed = null;
             if (activeInfeed['PM1'] && activeInfeed['PM5']) {
                 typeToFeed = lastFedType === 'PM1' ? 'PM5' : 'PM1';
@@ -482,7 +477,6 @@
             if (typeToFeed) {
                 infeedTimer -= dtMin;
                 if(infeedTimer <= 0) {
-                    // หาตำแหน่งถุงที่อยู่ใกล้จุด Infeed (X=0) มากที่สุด
                     let maxPos = PATH.InfeedEnd;
                     for (let other of bags) {
                         if (other.stage === 'infeed' || other.stage === 'wait_lift') {
@@ -496,11 +490,8 @@
                         infeedTimer = 1 / rate;
                         let batch = activeInfeed[typeToFeed];
                         
-                        // บันทึกเวลาที่ป้อนถุงใบแรกของ Batch เพื่อจับ OEE
                         if(!machines[typeToFeed].timings[batch.id]) {
                             machines[typeToFeed].timings[batch.id] = { infeedStart: simTimeElapsed };
-                            
-                            // NEW: บันทึกเวลาที่เริ่ม Batch แรกสุดของการรัน
                             if (runStats[typeToFeed].firstStart === null) {
                                 runStats[typeToFeed].firstStart = simTimeElapsed;
                             }
@@ -515,7 +506,7 @@
                             pos: 0
                         });
                         batch.left--;
-                        lastFedType = typeToFeed; // สลับเป็นอีกอันในรอบถัดไป
+                        lastFedType = typeToFeed; 
 
                         if(batch.type === 'PM1') stats.in1++; else stats.in5++;
                         updateQueueUI();
@@ -526,7 +517,7 @@
                             updateQueueUI();
                         }
                     } else {
-                        infeedTimer = 0; // รอจนกว่าจะมีที่ว่าง
+                        infeedTimer = 0; 
                     }
                 }
             } else {
@@ -539,9 +530,7 @@
                 
                 if(m.state === 'UNLOADING') {
                     m.ulTimer -= dtMin;
-                    if(m.ulTimer <= 0) {
-                        m.ulTimer = 0; 
-                    }
+                    if(m.ulTimer <= 0) m.ulTimer = 0; 
                 }
 
                 if(m.state === 'MIXING' || m.state === 'PACKING') {
@@ -559,7 +548,6 @@
                             let totalProcessTime;
                             let isFirst = false;
                             
-                            // การคิด OEE 
                             if (!t.outfeedStart || m.currentBatchId === 1) {
                                 totalProcessTime = simTimeElapsed - t.infeedStart;
                                 isFirst = true;
@@ -569,7 +557,6 @@
                                 
                             addReport(mKey, m.currentBatchId, totalProcessTime, isFirst);
                             
-                            // NEW: อัปเดตข้อมูลสรุปผลรวม (Total Run Summary)
                             runStats[mKey].batches++;
                             runStats[mKey].totalTime = simTimeElapsed - runStats[mKey].firstStart;
                             updateRunStatsUI();
@@ -580,15 +567,13 @@
                 }
             });
 
-            // 4. ลิฟต์ฟิสิกส์ (Lift Movement & Interlock)
-            // หยุดลิฟต์ถ้าพื้นที่ปลายทาง (A3) ไม่มีที่ให้ลงแล้ว (ป้องกันการทะลุกัน)
+            // 4. ลิฟต์ฟิสิกส์ (Lift Interlock)
             let isLiftExitBlocked = bags.some(b => 
                 (b.stage === 'convey' || b.stage === 'wait_unload') && 
                 (b.pos < BAG_LENGTH)
             );
             
             let isLiftMoving = !isLiftExitBlocked;
-
             if (isLiftMoving) {
                 liftCycle = (liftCycle + (SPEED_LIFT * dtMin)) % TRAY_SPACING;
             }
@@ -597,7 +582,7 @@
             const outRate1 = parseFloat(document.getElementById('outPM1Rate').value);
             const outRate5 = parseFloat(document.getElementById('outPM5Rate').value);
 
-            // 5. สายพานฟิสิกส์ (Conveyor Movement & Collision & Sorters)
+            // 5. สายพานฟิสิกส์ 
             for(let i=0; i<bags.length; i++) {
                 let b = bags[i];
                 let m = machines[b.type];
@@ -617,7 +602,6 @@
                     }
                 }
                 else if (b.stage === 'wait_lift') {
-                    // รอจนกว่าถาดลิฟต์จะมาตรง และลิฟต์ต้องขยับได้
                     let isFront = !bags.some(other => other.stage === 'lifting' && other.pos < 1.0);
                     if(isFront && isTrayAligned && isLiftMoving) {
                         b.stage = 'lifting';
@@ -641,14 +625,11 @@
                     let totalLen = b.type === 'PM1' ? PATH.PM1End : PATH.PM5End;
                     let maxPos = totalLen;
                     
-                    // เช็คชนกับถุงใบหน้าที่กำลังเคลื่อนที่ หรือ จอดรออยู่หน้าเซนเซอร์
                     for(let other of bags) {
                         if(other !== b && (other.stage === 'convey' || other.stage === 'wait_unload')) {
                             if (b.type === other.type) {
-                                // ประเภทเดียวกัน เช็คระยะชนได้ตลอดเส้นทาง
                                 if (other.pos > b.pos) maxPos = Math.min(maxPos, other.pos - BAG_LENGTH);
                             } else {
-                                // คนละประเภท เช็คระยะชนเฉพาะตอนใช้สายพานร่วมกัน (A3 - ก่อนถึง A4)
                                 if (other.pos > b.pos && (other.pos - BAG_LENGTH) < PATH.A4End) {
                                     maxPos = Math.min(maxPos, other.pos - BAG_LENGTH);
                                 }
@@ -674,7 +655,6 @@
                             m.q = 0;
                             m.ulTimer = 1 / (b.type === 'PM1' ? outRate1 : outRate5); 
                             
-                            // 🛑 BUG FIX: บันทึก outfeedStart เฉพาะตอนเทถุงใบแรกสุดของ Batch เท่านั้น
                             if (!m.timings[b.batchId]) m.timings[b.batchId] = {};
                             if (m.q === 0 && !m.timings[b.batchId].outfeedStart) {
                                 m.timings[b.batchId].outfeedStart = simTimeElapsed;
@@ -689,9 +669,10 @@
                             
                             if(m.q >= m.currentBatchTotal) {
                                 m.state = 'MIXING';
-                                m.timer = parseFloat(document.getElementById(mKey.toLowerCase()+'MixT').value);
-                                addLog(`🚚 ${mKey} Unloaded Batch #${m.currentBatchId}`, 'info');
-                                addLog(`🔄 ${mKey} started MIXING`, 'warn');
+                                // 🐛 BUG FIX: ตรงนี้แต่เดิมใช้ mKey ทำให้ JS Error ตอนจบ Batch ผมแก้เป็น b.type แล้วครับ
+                                m.timer = parseFloat(document.getElementById(b.type.toLowerCase()+'MixT').value);
+                                addLog(`🚚 ${b.type} Unloaded Batch #${m.currentBatchId}`, 'info');
+                                addLog(`🔄 ${b.type} started MIXING`, 'warn');
                             } else {
                                 m.ulTimer = 1 / (b.type === 'PM1' ? outRate1 : outRate5);
                             }
@@ -714,9 +695,9 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // ขยับพิกัดแกน Y ลงมาเพื่อให้มีพื้นที่ด้านบนเหลือเฟือ
-            const Y_LOWER = 750; 
-            const Y_UPPER = 480; 
+            // ขยับแกน Y ลงมา 80px เพื่อให้ไม่ทะลุขอบบน
+            const Y_LOWER = 750 + 80; 
+            const Y_UPPER = 480 + 80; 
             
             const xA1 = 80;
             const xB1 = xA1 + (PATH.InfeedEnd * SCALE);
@@ -724,7 +705,6 @@
             const xA3 = xB1 + 60; 
             const xA4 = xA3 + (PATH.A3End * SCALE);
             
-            // วาดเส้นแบ่งระดับชั้น
             ctx.strokeStyle = '#1e293b'; ctx.setLineDash([5, 5]); ctx.lineWidth = 1;
             ctx.beginPath(); ctx.moveTo(0, Y_LOWER+20); ctx.lineTo(canvas.width, Y_LOWER+20); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(0, Y_UPPER+20); ctx.lineTo(canvas.width, Y_UPPER+20); ctx.stroke();
@@ -734,7 +714,6 @@
             ctx.fillText('📍 ชั้นล่าง (Lower Level)', xA1 + 50, Y_LOWER - 30);
             ctx.fillText('📍 ชั้นบน (Upper Level)', xA3 + 50, Y_UPPER - 30);
 
-            // วาดสายพาน
             ctx.lineWidth = 14; ctx.strokeStyle = '#475569'; ctx.lineCap = 'butt';
             ctx.setLineDash([15, 10]);
             
@@ -758,10 +737,9 @@
             
             ctx.setLineDash([]); 
             
-            // Labels
             ctx.fillStyle = '#94a3b8'; ctx.font = '12px sans-serif';
             ctx.fillText(`S1 (In)`, xA1 + 10, Y_LOWER - 25);
-            ctx.fillText(`A1+A2 (Infeed 4.4m)`, xA1 + 20, Y_LOWER - 15);
+            ctx.fillText(`A1+A2 (Infeed 4.41m)`, xA1 + 20, Y_LOWER - 15);
             ctx.fillText(`S2 (Wait)`, xB1 - 40, Y_LOWER - 25);
             
             ctx.fillText(`S3 (Clear)`, xA3 + 10, Y_UPPER - 25);
@@ -776,7 +754,6 @@
             ctx.fillText(`A8 (PM5 3.7m)`, cx + 50, cy - R - 15);
             ctx.fillText(`S6 (PM5)`, a8EndX - 30, cy - R - 25);
             
-            // วาด Sensors
             const drawSensor = (x, y, isActive) => {
                 ctx.fillStyle = isActive ? '#ef4444' : '#10b981'; 
                 ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI*2); ctx.fill();
@@ -790,13 +767,11 @@
             drawSensor(pm1EndX - 20, Y_UPPER - 15, bags.some(b => b.type==='PM1' && b.stage === 'wait_unload'));
             drawSensor(a8EndX - 20, cy - R - 15, bags.some(b => b.type==='PM5' && b.stage === 'wait_unload'));
 
-            // วาดตัวผลัก A4 Pusher
             ctx.fillStyle = '#ef4444';
             ctx.fillRect(xA4-10, Y_UPPER + 10, 20, 10);
             ctx.fillRect(xA4-5, Y_UPPER + 20, 10, 15);
             ctx.fillText('A4 Pusher', xA4 - 20, Y_UPPER + 45);
 
-            // วาดลิฟต์ Section View 2.5D
             let liftWidth = 60;
             let liftTopY = Y_UPPER - 80;
             let liftBotY = Y_LOWER + 50;
@@ -808,7 +783,6 @@
             ctx.beginPath(); ctx.moveTo(xB1+30, liftTopY); ctx.lineTo(xB1+30, liftBotY); ctx.stroke();
             ctx.setLineDash([]);
 
-            // ถาดลิฟต์ฝั่งขาขึ้น
             ctx.fillStyle = '#38bdf8'; 
             for(let i=0; i<=PATH.LiftLen; i+=TRAY_SPACING) {
                 let yPos = i - liftCycle;
@@ -818,7 +792,7 @@
                     ctx.fillRect(xB1 + 5, drawY - 3, 20, 6);
                 }
             }
-            // ถาดลิฟต์ฝั่งขาลง (จำลอง)
+            
             ctx.fillStyle = '#475569'; 
             for(let i=0; i<=PATH.LiftLen; i+=TRAY_SPACING) {
                 let yPos = i - liftCycle;
@@ -830,7 +804,6 @@
                 }
             }
 
-            // วาดเครื่องจักร PM1 และ PM5
             const drawMachine = (name, x, y, color) => {
                 let m = machines[name];
                 ctx.fillStyle = color;
@@ -857,12 +830,10 @@
             drawMachine('PM1', pm1EndX, Y_UPPER, '#2563eb');
             drawMachine('PM5', a8EndX, cy - R, '#ea580c');
 
-            // วาดถุงทั้งหมดในระบบ
             bags.forEach(b => {
                 ctx.fillStyle = b.type === 'PM1' ? '#60a5fa' : '#fb923c';
                 ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
                 
-                // ถุง 90cm ผืนผ้า
                 let drawW = BAG_LENGTH * SCALE; 
                 let drawH = 22; 
                 let xCenter, yCenter, rotation = 0;
@@ -893,7 +864,6 @@
                                 yCenter = Y_UPPER - (dist * SCALE);
                                 rotation = -Math.PI / 2;
                             } else if (dist <= 3.19 + 1.25) { 
-                                // ช่วงโค้ง A7 คำนวณ Tangent องศาให้สไลด์ไปตามรางธรรมชาติ ไม่หมุนรอบตัวเอง
                                 let arcDist = dist - 3.19;
                                 let arcRatio = arcDist / 1.25;
                                 let angle = Math.PI + (arcRatio * Math.PI / 2); 
