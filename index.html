@@ -18,22 +18,20 @@
         
         .grid-layout { 
             display: grid; 
-            grid-template-columns: 280px 1fr; 
+            grid-template-columns: 320px 1fr; 
             gap: 20px; 
             min-height: 100vh; 
             padding: 20px; 
             box-sizing: border-box; 
         }
         
+        /* Sticky Control Panel */
         .side-panel { 
-            display: flex; 
-            flex-direction: column; 
-            gap: 15px; 
             position: sticky; 
             top: 20px; 
             height: calc(100vh - 40px); 
-            overflow-y: auto; 
-            padding-right: 5px; 
+            display: flex; 
+            flex-direction: column; 
         }
 
         .main-panel { 
@@ -45,16 +43,16 @@
 
         .canvas-container { 
             width: 100%; 
-            height: 100%; 
+            height: auto; 
             background: #0b1121; 
             border: 1px solid #334155; 
             border-radius: 8px; 
             position: relative; 
-            overflow: hidden; 
             display: flex; 
             justify-content: center; 
             align-items: center; 
         }
+        /* Responsive Canvas scaling */
         canvas { width: 100%; height: auto; object-fit: contain; }
         
         input[type=range] { width: 100%; accent-color: #3b82f6; }
@@ -68,7 +66,7 @@
             padding: 10px; 
             font-family: monospace; 
             font-size: 12px; 
-            height: 300px; 
+            height: 250px; 
             overflow-y: auto; 
             color: #94a3b8; 
         }
@@ -86,10 +84,11 @@
 
     <div class="grid-layout">
         <div class="side-panel">
-            <div class="bg-slate-800 p-4 rounded-lg border border-slate-700 shadow-xl">
+            <div class="bg-slate-800 p-4 rounded-lg border border-slate-700 shadow-xl overflow-y-auto h-full">
                 <h3 class="text-lg font-bold mb-3 text-blue-400">⚙️ Control Panel</h3>
                 
                 <div class="space-y-4">
+                    <!-- Worker Settings -->
                     <div>
                         <label class="text-sm font-semibold flex items-center gap-2">👨‍🔧 Worker (Bags/Min)</label>
                         <div class="mt-2 text-xs text-slate-400 space-y-2">
@@ -101,6 +100,7 @@
 
                     <hr class="border-slate-600">
                     
+                    <!-- Speed Settings -->
                     <div>
                         <label class="text-sm font-semibold flex items-center gap-2">🚀 ความเร็วระบบ (m/min)</label>
                         <div class="mt-2 text-xs text-slate-400 space-y-2">
@@ -111,6 +111,7 @@
 
                     <hr class="border-slate-600">
 
+                    <!-- Batch Queue Settings -->
                     <div>
                         <div class="flex justify-between items-center mb-2">
                             <label class="text-sm font-semibold flex items-center gap-2">📦 Batch Queue</label>
@@ -134,6 +135,7 @@
 
                     <hr class="border-slate-600">
 
+                    <!-- Time Settings -->
                     <div>
                         <label class="text-sm font-semibold flex items-center gap-2 mb-2">⏱️ ตั้งค่าเวลาเครื่อง Mix/Pack (นาที)</label>
                         <div class="flex gap-2">
@@ -146,6 +148,7 @@
                         </div>
                     </div>
 
+                    <!-- Simulator Modes -->
                     <div>
                         <label class="text-sm font-semibold">⚡ Run Mode</label>
                         <select id="runMode" class="w-full mt-1 bg-slate-700 text-white text-xs p-2 rounded border border-slate-600 focus:outline-none">
@@ -165,11 +168,12 @@
                     </div>
                 </div>
 
-                <button id="mainBtn" class="btn bg-emerald-600 hover:bg-emerald-500 w-full mt-6 py-3 text-lg shadow-lg shadow-emerald-900/50 uppercase tracking-wider" onclick="toggleSim()">▶ Start Simulation</button>
+                <button id="mainBtn" class="btn bg-emerald-600 hover:bg-emerald-500 w-full mt-6 py-3 text-lg shadow-lg shadow-emerald-900/50 uppercase tracking-wider" onclick="toggleSim()">▶ START SIMULATION</button>
             </div>
         </div>
 
         <div class="main-panel">
+            <!-- 1. Live Flow Stats -->
             <div class="stats-grid">
                 <div class="stat-box border-b-4 border-blue-500 shadow-md">
                     <p class="text-xs text-slate-400 uppercase tracking-widest">Infeed PM1</p>
@@ -189,10 +193,48 @@
                 </div>
             </div>
 
-            <div class="canvas-container shadow-inner">
-                <canvas id="simCanvas" width="1200" height="800"></canvas>
+            <!-- 2. NEW: Production Run Summary Cards -->
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-slate-800/80 rounded-lg border border-slate-700 p-3 shadow-md flex justify-between items-center border-l-4 border-l-blue-500">
+                    <div>
+                        <h4 class="text-sm font-bold text-slate-300">🔵 สรุปผลผลิต PM1</h4>
+                        <p class="text-[10px] text-slate-500">Total Production Run</p>
+                    </div>
+                    <div class="text-right flex gap-4">
+                        <div>
+                            <div class="text-[10px] text-slate-400 uppercase">Total Batches</div>
+                            <div class="text-xl font-bold text-blue-400" id="pm1TotalBatches">0</div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] text-slate-400 uppercase">Total Time (Min)</div>
+                            <div class="text-xl font-bold text-emerald-400" id="pm1TotalTime">0.0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-slate-800/80 rounded-lg border border-slate-700 p-3 shadow-md flex justify-between items-center border-l-4 border-l-orange-500">
+                    <div>
+                        <h4 class="text-sm font-bold text-slate-300">🟠 สรุปผลผลิต PM5</h4>
+                        <p class="text-[10px] text-slate-500">Total Production Run</p>
+                    </div>
+                    <div class="text-right flex gap-4">
+                        <div>
+                            <div class="text-[10px] text-slate-400 uppercase">Total Batches</div>
+                            <div class="text-xl font-bold text-orange-400" id="pm5TotalBatches">0</div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] text-slate-400 uppercase">Total Time (Min)</div>
+                            <div class="text-xl font-bold text-emerald-400" id="pm5TotalTime">0.0</div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
+            <!-- 3. Canvas Simulation -->
+            <div class="canvas-container shadow-inner">
+                <canvas id="simCanvas" width="1200" height="850"></canvas>
+            </div>
+
+            <!-- 4. Reports & Logs -->
             <div class="log-grid">
                 <div class="bg-slate-800 rounded-lg border border-slate-700 p-3 shadow-md">
                     <h4 class="text-sm font-bold text-slate-300 mb-2 flex items-center gap-2">📄 Event Logs</h4>
@@ -200,7 +242,7 @@
                 </div>
                 <div class="bg-slate-800 rounded-lg border border-slate-700 p-3 shadow-md">
                     <h4 class="text-sm font-bold text-slate-300 mb-2 flex items-center gap-2">📊 Batch Summary Report</h4>
-                    <div id="reportBox" class="log-box rounded bg-slate-900 p-2 flex flex-col items-center text-center">
+                    <div id="reportBox" class="log-box rounded bg-slate-900 p-2 flex flex-col items-center text-center space-y-2">
                         รอถาดำเนินการ Batch แรก...
                     </div>
                 </div>
@@ -209,6 +251,7 @@
     </div>
 
     <script>
+        // --- System Constants & Physics Parameters ---
         const SCALE = 65; 
         let timeMultiplier = 20;
         let isRunning = false;
@@ -218,6 +261,7 @@
         let SPEED_CV = 20; 
         let SPEED_LIFT = 15; 
 
+        // ขนาดถุงตามความจริง (ยาว 90cm + gap ป้องกันชน = 95cm)
         const BAG_LENGTH = 0.95; 
         const TRAY_SPACING = 2.0; 
         
@@ -235,6 +279,7 @@
         const logBox = document.getElementById('eventLog');
         const reportBox = document.getElementById('reportBox');
         
+        // --- State Variables ---
         let queues = { 'PM1': [], 'PM5': [] };
         let activeInfeed = { 'PM1': null, 'PM5': null };
         let lastFedType = 'PM5'; 
@@ -245,12 +290,19 @@
         let infeedTimer = 0;
 
         let stats = { in1: 0, out1: 0, in5: 0, out5: 0 };
+        
+        // NEW: Total Simulation Run Stats
+        let runStats = {
+            'PM1': { batches: 0, firstStart: null, totalTime: 0 },
+            'PM5': { batches: 0, firstStart: null, totalTime: 0 }
+        };
 
         let machines = {
             'PM1': { state: 'IDLE', timer: 0, ulTimer: 0, q: 0, currentBatchId: null, currentBatchTotal: 0, timings: {} },
             'PM5': { state: 'IDLE', timer: 0, ulTimer: 0, q: 0, currentBatchId: null, currentBatchTotal: 0, timings: {} }
         };
 
+        // --- Functions ---
         function updateSpeeds() {
             SPEED_CV = parseFloat(document.getElementById('cvSpeed').value);
             SPEED_LIFT = parseFloat(document.getElementById('liftSpeed').value);
@@ -268,7 +320,23 @@
             queues = { 'PM1': [], 'PM5': [] };
             activeInfeed = { 'PM1': null, 'PM5': null };
             batchCounters = { 'PM1': 1, 'PM5': 1 };
+            
+            // ล้างข้อมูลการคำนวณทั้งหมดของการ Simulate รอบนี้
+            runStats = {
+                'PM1': { batches: 0, firstStart: null, totalTime: 0 },
+                'PM5': { batches: 0, firstStart: null, totalTime: 0 }
+            };
+            updateRunStatsUI();
+            
             updateQueueUI();
+            addLog("🗑️ ล้างคิวการผลิต และ รีเซ็ตข้อมูลสรุปเวลา", "warn");
+        }
+        
+        function updateRunStatsUI() {
+            document.getElementById('pm1TotalBatches').innerText = runStats['PM1'].batches;
+            document.getElementById('pm1TotalTime').innerText = runStats['PM1'].totalTime.toFixed(1);
+            document.getElementById('pm5TotalBatches').innerText = runStats['PM5'].batches;
+            document.getElementById('pm5TotalTime').innerText = runStats['PM5'].totalTime.toFixed(1);
         }
 
         function updateQueueUI() {
@@ -381,28 +449,27 @@
             lastTime = timestamp;
             simTimeElapsed += dtMin;
 
-            // 1. Infeed Logic
+            // 1. ดึงคิวเข้าสู่ Infeed Process แยกขาดจากสถานะเครื่องจักร
             ['PM1', 'PM5'].forEach(type => {
                 if (!activeInfeed[type] && queues[type].length > 0) {
                     const runMode = document.getElementById('runMode').value;
                     let canStart = true;
                     if (runMode === 'wait') {
+                        // โหมดทีละ Batch จะรอจนกว่าเครื่องของตัวเองจะว่างและไม่มีถุงบนสายพาน
                         if (machines[type].state !== 'IDLE' || bags.some(b => b.type === type)) {
                             canStart = false;
                         }
                     }
                     if (canStart) {
                         activeInfeed[type] = queues[type].shift();
-                        if(!machines[type].timings[activeInfeed[type].id]) {
-                            machines[type].timings[activeInfeed[type].id] = { infeedStart: simTimeElapsed };
-                        }
                         
-                        addLog(`👨‍🔧 Infeed เริ่มเท ${type} Batch #${activeInfeed[type].id}`);
+                        addLog(`👨‍🔧 Infeed เริ่มเตรียมเท ${type} Batch #${activeInfeed[type].id}`);
                         updateQueueUI();
                     }
                 }
             });
 
+            // 2. คนป้อนสินค้า (Alternating logic) สลับเททีละถุงระหว่าง PM1 และ PM5
             let typeToFeed = null;
             if (activeInfeed['PM1'] && activeInfeed['PM5']) {
                 typeToFeed = lastFedType === 'PM1' ? 'PM5' : 'PM1';
@@ -415,6 +482,7 @@
             if (typeToFeed) {
                 infeedTimer -= dtMin;
                 if(infeedTimer <= 0) {
+                    // หาตำแหน่งถุงที่อยู่ใกล้จุด Infeed (X=0) มากที่สุด
                     let maxPos = PATH.InfeedEnd;
                     for (let other of bags) {
                         if (other.stage === 'infeed' || other.stage === 'wait_lift') {
@@ -428,6 +496,16 @@
                         infeedTimer = 1 / rate;
                         let batch = activeInfeed[typeToFeed];
                         
+                        // บันทึกเวลาที่ป้อนถุงใบแรกของ Batch เพื่อจับ OEE
+                        if(!machines[typeToFeed].timings[batch.id]) {
+                            machines[typeToFeed].timings[batch.id] = { infeedStart: simTimeElapsed };
+                            
+                            // NEW: บันทึกเวลาที่เริ่ม Batch แรกสุดของการรัน
+                            if (runStats[typeToFeed].firstStart === null) {
+                                runStats[typeToFeed].firstStart = simTimeElapsed;
+                            }
+                        }
+
                         bags.push({
                             id: Math.random(),
                             type: batch.type,
@@ -437,7 +515,7 @@
                             pos: 0
                         });
                         batch.left--;
-                        lastFedType = typeToFeed; 
+                        lastFedType = typeToFeed; // สลับเป็นอีกอันในรอบถัดไป
 
                         if(batch.type === 'PM1') stats.in1++; else stats.in5++;
                         updateQueueUI();
@@ -448,13 +526,14 @@
                             updateQueueUI();
                         }
                     } else {
-                        infeedTimer = 0; 
+                        infeedTimer = 0; // รอจนกว่าจะมีที่ว่าง
                     }
                 }
             } else {
                 infeedTimer = 0;
             }
 
+            // 3. จัดการสถานะเครื่องจักร (Unloading -> Mixing -> Packing)
             ['PM1', 'PM5'].forEach(mKey => {
                 let m = machines[mKey];
                 
@@ -480,7 +559,8 @@
                             let totalProcessTime;
                             let isFirst = false;
                             
-                            if (m.currentBatchId === 1 || !t.outfeedStart) {
+                            // การคิด OEE 
+                            if (!t.outfeedStart || m.currentBatchId === 1) {
                                 totalProcessTime = simTimeElapsed - t.infeedStart;
                                 isFirst = true;
                             } else {
@@ -488,17 +568,26 @@
                             }
                                 
                             addReport(mKey, m.currentBatchId, totalProcessTime, isFirst);
+                            
+                            // NEW: อัปเดตข้อมูลสรุปผลรวม (Total Run Summary)
+                            runStats[mKey].batches++;
+                            runStats[mKey].totalTime = simTimeElapsed - runStats[mKey].firstStart;
+                            updateRunStatsUI();
+
                             m.currentBatchId = null;
                         }
                     }
                 }
             });
 
+            // 4. ลิฟต์ฟิสิกส์ (Lift Movement & Interlock)
+            // หยุดลิฟต์ถ้าพื้นที่ปลายทาง (A3) ไม่มีที่ให้ลงแล้ว (ป้องกันการทะลุกัน)
             let isLiftExitBlocked = bags.some(b => 
                 (b.stage === 'convey' || b.stage === 'wait_unload') && 
                 (b.pos < BAG_LENGTH)
             );
-            let isLiftMoving = !isLiftExitBlocked; 
+            
+            let isLiftMoving = !isLiftExitBlocked;
 
             if (isLiftMoving) {
                 liftCycle = (liftCycle + (SPEED_LIFT * dtMin)) % TRAY_SPACING;
@@ -508,6 +597,7 @@
             const outRate1 = parseFloat(document.getElementById('outPM1Rate').value);
             const outRate5 = parseFloat(document.getElementById('outPM5Rate').value);
 
+            // 5. สายพานฟิสิกส์ (Conveyor Movement & Collision & Sorters)
             for(let i=0; i<bags.length; i++) {
                 let b = bags[i];
                 let m = machines[b.type];
@@ -527,6 +617,7 @@
                     }
                 }
                 else if (b.stage === 'wait_lift') {
+                    // รอจนกว่าถาดลิฟต์จะมาตรง และลิฟต์ต้องขยับได้
                     let isFront = !bags.some(other => other.stage === 'lifting' && other.pos < 1.0);
                     if(isFront && isTrayAligned && isLiftMoving) {
                         b.stage = 'lifting';
@@ -550,11 +641,14 @@
                     let totalLen = b.type === 'PM1' ? PATH.PM1End : PATH.PM5End;
                     let maxPos = totalLen;
                     
+                    // เช็คชนกับถุงใบหน้าที่กำลังเคลื่อนที่ หรือ จอดรออยู่หน้าเซนเซอร์
                     for(let other of bags) {
                         if(other !== b && (other.stage === 'convey' || other.stage === 'wait_unload')) {
                             if (b.type === other.type) {
+                                // ประเภทเดียวกัน เช็คระยะชนได้ตลอดเส้นทาง
                                 if (other.pos > b.pos) maxPos = Math.min(maxPos, other.pos - BAG_LENGTH);
                             } else {
+                                // คนละประเภท เช็คระยะชนเฉพาะตอนใช้สายพานร่วมกัน (A3 - ก่อนถึง A4)
                                 if (other.pos > b.pos && (other.pos - BAG_LENGTH) < PATH.A4End) {
                                     maxPos = Math.min(maxPos, other.pos - BAG_LENGTH);
                                 }
@@ -572,22 +666,23 @@
                 }
                 else if (b.stage === 'wait_unload') {
                     if(m.state === 'IDLE' || m.state === 'UNLOADING') {
+                        
                         if(m.state === 'IDLE' && m.currentBatchId === null) {
                             m.state = 'UNLOADING';
                             m.currentBatchId = b.batchId;
                             m.currentBatchTotal = b.batchTotal; 
                             m.q = 0;
                             m.ulTimer = 1 / (b.type === 'PM1' ? outRate1 : outRate5); 
-                        }
-                        
-                        if(m.currentBatchId === b.batchId && m.state === 'UNLOADING' && m.ulTimer <= 0) {
                             
-                            // 🛑 OEE Time Fix: บันทึกเฉพาะตอนกรีดถุงใบแรกของ Batch เท่านั้น
+                            // 🛑 BUG FIX: บันทึก outfeedStart เฉพาะตอนเทถุงใบแรกสุดของ Batch เท่านั้น
                             if (!m.timings[b.batchId]) m.timings[b.batchId] = {};
                             if (m.q === 0 && !m.timings[b.batchId].outfeedStart) {
                                 m.timings[b.batchId].outfeedStart = simTimeElapsed;
                             }
-
+                        }
+                        
+                        if(m.currentBatchId === b.batchId && m.state === 'UNLOADING' && m.ulTimer <= 0) {
+                            
                             b.stage = 'done';
                             m.q++;
                             if(b.type === 'PM1') stats.out1++; else stats.out5++;
@@ -619,8 +714,9 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            const Y_LOWER = 700; 
-            const Y_UPPER = 430; 
+            // ขยับพิกัดแกน Y ลงมาเพื่อให้มีพื้นที่ด้านบนเหลือเฟือ
+            const Y_LOWER = 750; 
+            const Y_UPPER = 480; 
             
             const xA1 = 80;
             const xB1 = xA1 + (PATH.InfeedEnd * SCALE);
@@ -628,6 +724,7 @@
             const xA3 = xB1 + 60; 
             const xA4 = xA3 + (PATH.A3End * SCALE);
             
+            // วาดเส้นแบ่งระดับชั้น
             ctx.strokeStyle = '#1e293b'; ctx.setLineDash([5, 5]); ctx.lineWidth = 1;
             ctx.beginPath(); ctx.moveTo(0, Y_LOWER+20); ctx.lineTo(canvas.width, Y_LOWER+20); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(0, Y_UPPER+20); ctx.lineTo(canvas.width, Y_UPPER+20); ctx.stroke();
@@ -637,6 +734,7 @@
             ctx.fillText('📍 ชั้นล่าง (Lower Level)', xA1 + 50, Y_LOWER - 30);
             ctx.fillText('📍 ชั้นบน (Upper Level)', xA3 + 50, Y_UPPER - 30);
 
+            // วาดสายพาน
             ctx.lineWidth = 14; ctx.strokeStyle = '#475569'; ctx.lineCap = 'butt';
             ctx.setLineDash([15, 10]);
             
@@ -660,6 +758,7 @@
             
             ctx.setLineDash([]); 
             
+            // Labels
             ctx.fillStyle = '#94a3b8'; ctx.font = '12px sans-serif';
             ctx.fillText(`S1 (In)`, xA1 + 10, Y_LOWER - 25);
             ctx.fillText(`A1+A2 (Infeed 4.4m)`, xA1 + 20, Y_LOWER - 15);
@@ -677,6 +776,7 @@
             ctx.fillText(`A8 (PM5 3.7m)`, cx + 50, cy - R - 15);
             ctx.fillText(`S6 (PM5)`, a8EndX - 30, cy - R - 25);
             
+            // วาด Sensors
             const drawSensor = (x, y, isActive) => {
                 ctx.fillStyle = isActive ? '#ef4444' : '#10b981'; 
                 ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI*2); ctx.fill();
@@ -690,11 +790,13 @@
             drawSensor(pm1EndX - 20, Y_UPPER - 15, bags.some(b => b.type==='PM1' && b.stage === 'wait_unload'));
             drawSensor(a8EndX - 20, cy - R - 15, bags.some(b => b.type==='PM5' && b.stage === 'wait_unload'));
 
+            // วาดตัวผลัก A4 Pusher
             ctx.fillStyle = '#ef4444';
             ctx.fillRect(xA4-10, Y_UPPER + 10, 20, 10);
             ctx.fillRect(xA4-5, Y_UPPER + 20, 10, 15);
             ctx.fillText('A4 Pusher', xA4 - 20, Y_UPPER + 45);
 
+            // วาดลิฟต์ Section View 2.5D
             let liftWidth = 60;
             let liftTopY = Y_UPPER - 80;
             let liftBotY = Y_LOWER + 50;
@@ -706,6 +808,7 @@
             ctx.beginPath(); ctx.moveTo(xB1+30, liftTopY); ctx.lineTo(xB1+30, liftBotY); ctx.stroke();
             ctx.setLineDash([]);
 
+            // ถาดลิฟต์ฝั่งขาขึ้น
             ctx.fillStyle = '#38bdf8'; 
             for(let i=0; i<=PATH.LiftLen; i+=TRAY_SPACING) {
                 let yPos = i - liftCycle;
@@ -715,6 +818,7 @@
                     ctx.fillRect(xB1 + 5, drawY - 3, 20, 6);
                 }
             }
+            // ถาดลิฟต์ฝั่งขาลง (จำลอง)
             ctx.fillStyle = '#475569'; 
             for(let i=0; i<=PATH.LiftLen; i+=TRAY_SPACING) {
                 let yPos = i - liftCycle;
@@ -726,6 +830,7 @@
                 }
             }
 
+            // วาดเครื่องจักร PM1 และ PM5
             const drawMachine = (name, x, y, color) => {
                 let m = machines[name];
                 ctx.fillStyle = color;
@@ -752,10 +857,12 @@
             drawMachine('PM1', pm1EndX, Y_UPPER, '#2563eb');
             drawMachine('PM5', a8EndX, cy - R, '#ea580c');
 
+            // วาดถุงทั้งหมดในระบบ
             bags.forEach(b => {
                 ctx.fillStyle = b.type === 'PM1' ? '#60a5fa' : '#fb923c';
                 ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
                 
+                // ถุง 90cm ผืนผ้า
                 let drawW = BAG_LENGTH * SCALE; 
                 let drawH = 22; 
                 let xCenter, yCenter, rotation = 0;
@@ -786,6 +893,7 @@
                                 yCenter = Y_UPPER - (dist * SCALE);
                                 rotation = -Math.PI / 2;
                             } else if (dist <= 3.19 + 1.25) { 
+                                // ช่วงโค้ง A7 คำนวณ Tangent องศาให้สไลด์ไปตามรางธรรมชาติ ไม่หมุนรอบตัวเอง
                                 let arcDist = dist - 3.19;
                                 let arcRatio = arcDist / 1.25;
                                 let angle = Math.PI + (arcRatio * Math.PI / 2); 
@@ -827,6 +935,7 @@
 
         draw();
         updateQueueUI();
+        updateRunStatsUI();
     </script>
 </body>
 </html>
