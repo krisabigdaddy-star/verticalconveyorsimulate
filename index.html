@@ -13,7 +13,7 @@
             color: white; 
             margin: 0; 
             min-height: 100vh; 
-            overflow-y: auto; 
+            overflow-y: auto; /* ปลดล็อคให้ Scroll หน้าจอได้ */
         }
         
         .grid-layout { 
@@ -25,7 +25,7 @@
             box-sizing: border-box; 
         }
         
-        /* Sticky Control Panel */
+        /* Sticky Control Panel (ตรึงแผงควบคุมไว้เวลาเลื่อนจอ) */
         .side-panel { 
             position: sticky; 
             top: 20px; 
@@ -229,9 +229,9 @@
                 </div>
             </div>
 
-            <!-- 3. Canvas Simulation -->
+            <!-- 3. Canvas Simulation (ขยาย height เป็น 900 เพื่อไม่ให้ตกขอบ) -->
             <div class="canvas-container shadow-inner">
-                <canvas id="simCanvas" width="1200" height="850"></canvas>
+                <canvas id="simCanvas" width="1200" height="900"></canvas>
             </div>
 
             <!-- 4. Reports & Logs -->
@@ -240,10 +240,12 @@
                     <h4 class="text-sm font-bold text-slate-300 mb-2 flex items-center gap-2">📄 Event Logs</h4>
                     <div id="eventLog" class="log-box rounded bg-slate-900"></div>
                 </div>
-                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3 shadow-md">
+                <div class="bg-slate-800 rounded-lg border border-slate-700 p-3 shadow-md flex flex-col">
                     <h4 class="text-sm font-bold text-slate-300 mb-2 flex items-center gap-2">📊 Batch Summary Report</h4>
-                    <div id="reportBox" class="log-box rounded bg-slate-900 p-2 flex flex-col items-center text-center space-y-2">
-                        รอถาดำเนินการ Batch แรก...
+                    <div id="reportBox" class="flex-1 rounded bg-slate-900 p-2 overflow-y-auto space-y-2" style="max-height: 250px;">
+                        <div class="h-full flex flex-col justify-center items-center text-center text-slate-500 text-xs" id="reportEmptyState">
+                            รอถาดำเนินการ Batch แรก...
+                        </div>
                     </div>
                 </div>
             </div>
@@ -261,7 +263,7 @@
         let SPEED_CV = 20; 
         let SPEED_LIFT = 15; 
 
-        // ขนาดถุง 90cm + gap 5cm
+        // ขนาดถุง 90cm + gap 5cm = 95cm
         const BAG_LENGTH = 0.95; 
         const TRAY_SPACING = 2.0; 
         
@@ -282,7 +284,7 @@
         // --- State Variables ---
         let queues = { 'PM1': [], 'PM5': [] };
         let activeInfeed = { 'PM1': null, 'PM5': null };
-        let lastFedType = 'PM5'; 
+        let lastFedType = 'PM5'; // ตัวแปรจดจำว่าถุงที่แล้วเทเครื่องไหน (สำหรับสลับเท)
         let batchCounters = { 'PM1': 1, 'PM5': 1 };
         
         let bags = [];
@@ -301,7 +303,6 @@
             'PM5': { state: 'IDLE', timer: 0, ulTimer: 0, q: 0, currentBatchId: null, currentBatchTotal: 0, timings: {} }
         };
 
-        // --- Functions ---
         function updateSpeeds() {
             SPEED_CV = parseFloat(document.getElementById('cvSpeed').value);
             SPEED_LIFT = parseFloat(document.getElementById('liftSpeed').value);
@@ -324,6 +325,13 @@
                 'PM1': { batches: 0, firstStart: null, totalTime: 0 },
                 'PM5': { batches: 0, firstStart: null, totalTime: 0 }
             };
+            
+            reportBox.innerHTML = `
+                <div class="h-full flex flex-col justify-center items-center text-center text-slate-500 text-xs" id="reportEmptyState">
+                    รอถาดำเนินการ Batch แรก...
+                </div>
+            `;
+            
             updateRunStatsUI();
             updateQueueUI();
             addLog("🗑️ ล้างคิวการผลิต และ รีเซ็ตข้อมูลสรุปเวลา", "warn");
@@ -390,10 +398,9 @@
         }
 
         function addReport(machine, batchId, timeMins, isFirst) {
-            if(reportBox.innerText.includes('รอถาดำเนินการ')) {
-                reportBox.innerHTML = '';
-                reportBox.classList.remove('justify-center', 'items-center', 'text-center');
-                reportBox.classList.add('items-stretch', 'text-left');
+            const emptyState = document.getElementById('reportEmptyState');
+            if(emptyState) {
+                emptyState.remove();
             }
             
             let remark = isFirst ? 
@@ -404,7 +411,7 @@
             let icon = machine === 'PM1' ? '🔵' : '🟠';
             
             let html = `
-            <div class="bg-slate-800/80 p-2.5 rounded mb-2 border-l-4 ${borderColor} shadow-sm w-full flex flex-col sm:flex-row sm:justify-between sm:items-center">
+            <div class="bg-slate-800/80 p-2.5 rounded mb-2 border-l-4 ${borderColor} shadow-sm w-full flex flex-col sm:flex-row sm:justify-between sm:items-center shrink-0">
                 <div>
                     <div class="font-bold text-white text-sm">${icon} [${machine}] Batch #${batchId} แพ็คเสร็จสมบูรณ์</div>
                     <div class="text-[10px] text-slate-500 mt-1 italic">${remark}</div>
@@ -446,7 +453,7 @@
             lastTime = timestamp;
             simTimeElapsed += dtMin;
 
-            // 1. ดึงคิวเข้าสู่ Infeed 
+            // 1. ดึงคิวเข้าสู่ Infeed (ทำงานเมื่อ Infeed วางของรอบที่แล้วหมดแล้ว)
             ['PM1', 'PM5'].forEach(type => {
                 if (!activeInfeed[type] && queues[type].length > 0) {
                     const runMode = document.getElementById('runMode').value;
@@ -464,7 +471,7 @@
                 }
             });
 
-            // 2. คนป้อนสินค้า (Alternating logic)
+            // 2. คนป้อนสินค้า (Alternating logic สลับสายพาน)
             let typeToFeed = null;
             if (activeInfeed['PM1'] && activeInfeed['PM5']) {
                 typeToFeed = lastFedType === 'PM1' ? 'PM5' : 'PM1';
@@ -491,7 +498,7 @@
                         let batch = activeInfeed[typeToFeed];
                         
                         if(!machines[typeToFeed].timings[batch.id]) {
-                            machines[typeToFeed].timings[batch.id] = { infeedStart: simTimeElapsed };
+                            machines[typeToFeed].timings[batch.id] = { infeedStart: simTimeElapsed, outfeedStart: null };
                             if (runStats[typeToFeed].firstStart === null) {
                                 runStats[typeToFeed].firstStart = simTimeElapsed;
                             }
@@ -506,7 +513,7 @@
                             pos: 0
                         });
                         batch.left--;
-                        lastFedType = typeToFeed; 
+                        lastFedType = typeToFeed; // สลับสิทธิ์ให้ฝั่งตรงข้ามในรอบถัดไป
 
                         if(batch.type === 'PM1') stats.in1++; else stats.in5++;
                         updateQueueUI();
@@ -548,7 +555,7 @@
                             let totalProcessTime;
                             let isFirst = false;
                             
-                            if (!t.outfeedStart || m.currentBatchId === 1) {
+                            if (m.currentBatchId === 1) {
                                 totalProcessTime = simTimeElapsed - t.infeedStart;
                                 isFirst = true;
                             } else {
@@ -567,13 +574,24 @@
                 }
             });
 
-            // 4. ลิฟต์ฟิสิกส์ (Lift Interlock)
-            let isLiftExitBlocked = bags.some(b => 
+            // 4. ลิฟต์ฟิสิกส์ (ZPA - Zero Pressure Accumulation Logic)
+            
+            // S3 Sensor Check: เช็คว่าต้นสายพาน A3 (ชั้นบน) มีถุงขวางอยู่ไหม (ระยะ 0-0.95m)
+            let isS3Blocked = bags.some(b => 
                 (b.stage === 'convey' || b.stage === 'wait_unload') && 
                 (b.pos < BAG_LENGTH)
             );
             
-            let isLiftMoving = !isLiftExitBlocked;
+            // S7 Sensor Check: เช็คว่ามีถุงอยู่ในลิฟต์ "ตำแหน่งสูงสุด" (พร้อมออก) หรือไม่
+            let isBagAtTopElevator = bags.some(b => 
+                b.stage === 'lifting' && b.pos >= PATH.LiftLen - 0.1 
+            );
+            
+            // ZPA Logic: ลิฟต์จะหยุดหมุน (Interlock) ก็ต่อเมื่อ...
+            // 1. มีถุงขวางอยู่ที่ S3 (A3 เต็ม) 
+            // 2. "และ" มีถุงขึ้นมาถึงจุดสูงสุดของลิฟต์แล้ว (ไปต่อไม่ได้)
+            let isLiftMoving = !(isS3Blocked && isBagAtTopElevator);
+            
             if (isLiftMoving) {
                 liftCycle = (liftCycle + (SPEED_LIFT * dtMin)) % TRAY_SPACING;
             }
@@ -582,7 +600,7 @@
             const outRate1 = parseFloat(document.getElementById('outPM1Rate').value);
             const outRate5 = parseFloat(document.getElementById('outPM5Rate').value);
 
-            // 5. สายพานฟิสิกส์ 
+            // 5. สายพานฟิสิกส์ & Collision Logic
             for(let i=0; i<bags.length; i++) {
                 let b = bags[i];
                 let m = machines[b.type];
@@ -613,7 +631,7 @@
                         b.pos += SPEED_LIFT * dtMin;
                     }
                     if(b.pos >= PATH.LiftLen) {
-                        if (!isLiftExitBlocked) {
+                        if (!isS3Blocked) {
                             b.pos = 0;
                             b.stage = 'convey';
                         } else {
@@ -655,8 +673,9 @@
                             m.q = 0;
                             m.ulTimer = 1 / (b.type === 'PM1' ? outRate1 : outRate5); 
                             
+                            // บันทึกเวลาเริ่มเทถุงแรกที่ Outfeed (บันทึกแค่ครั้งเดียว)
                             if (!m.timings[b.batchId]) m.timings[b.batchId] = {};
-                            if (m.q === 0 && !m.timings[b.batchId].outfeedStart) {
+                            if (m.timings[b.batchId].outfeedStart === null || m.timings[b.batchId].outfeedStart === undefined) {
                                 m.timings[b.batchId].outfeedStart = simTimeElapsed;
                             }
                         }
@@ -669,7 +688,6 @@
                             
                             if(m.q >= m.currentBatchTotal) {
                                 m.state = 'MIXING';
-                                // 🐛 BUG FIX: ตรงนี้แต่เดิมใช้ mKey ทำให้ JS Error ตอนจบ Batch ผมแก้เป็น b.type แล้วครับ
                                 m.timer = parseFloat(document.getElementById(b.type.toLowerCase()+'MixT').value);
                                 addLog(`🚚 ${b.type} Unloaded Batch #${m.currentBatchId}`, 'info');
                                 addLog(`🔄 ${b.type} started MIXING`, 'warn');
@@ -695,9 +713,9 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // ขยับแกน Y ลงมา 80px เพื่อให้ไม่ทะลุขอบบน
-            const Y_LOWER = 750 + 80; 
-            const Y_UPPER = 480 + 80; 
+            // ขยับแกน Y เพื่อให้สมดุลทั้งขอบบนและขอบล่าง (Canvas 1200x900)
+            const Y_UPPER = 450; 
+            const Y_LOWER = 750; 
             
             const xA1 = 80;
             const xB1 = xA1 + (PATH.InfeedEnd * SCALE);
@@ -705,6 +723,7 @@
             const xA3 = xB1 + 60; 
             const xA4 = xA3 + (PATH.A3End * SCALE);
             
+            // วาดเส้นประแสดงระดับชั้น
             ctx.strokeStyle = '#1e293b'; ctx.setLineDash([5, 5]); ctx.lineWidth = 1;
             ctx.beginPath(); ctx.moveTo(0, Y_LOWER+20); ctx.lineTo(canvas.width, Y_LOWER+20); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(0, Y_UPPER+20); ctx.lineTo(canvas.width, Y_UPPER+20); ctx.stroke();
@@ -714,6 +733,7 @@
             ctx.fillText('📍 ชั้นล่าง (Lower Level)', xA1 + 50, Y_LOWER - 30);
             ctx.fillText('📍 ชั้นบน (Upper Level)', xA3 + 50, Y_UPPER - 30);
 
+            // วาดสายพาน
             ctx.lineWidth = 14; ctx.strokeStyle = '#475569'; ctx.lineCap = 'butt';
             ctx.setLineDash([15, 10]);
             
@@ -737,6 +757,7 @@
             
             ctx.setLineDash([]); 
             
+            // ป้ายชื่อสายพานและเซนเซอร์
             ctx.fillStyle = '#94a3b8'; ctx.font = '12px sans-serif';
             ctx.fillText(`S1 (In)`, xA1 + 10, Y_LOWER - 25);
             ctx.fillText(`A1+A2 (Infeed 4.41m)`, xA1 + 20, Y_LOWER - 15);
@@ -778,6 +799,10 @@
             ctx.strokeStyle = '#0ea5e9'; ctx.lineWidth = 2;
             ctx.strokeRect(xB1, liftTopY, liftWidth, liftBotY - liftTopY);
             ctx.fillStyle = '#0ea5e9'; ctx.fillText(`B1 (Lift 6m)`, xB1, liftBotY + 15);
+            
+            // New Sensor S7 for Lift Top Position
+            ctx.fillStyle = '#facc15'; ctx.fillText(`S7 (Lift Top)`, xB1 - 70, liftTopY + 85);
+            drawSensor(xB1 - 5, liftTopY + 80, bags.some(b => b.stage === 'lifting' && b.pos >= PATH.LiftLen - 0.1));
             
             ctx.strokeStyle = '#334155'; ctx.setLineDash([3,3]);
             ctx.beginPath(); ctx.moveTo(xB1+30, liftTopY); ctx.lineTo(xB1+30, liftBotY); ctx.stroke();
@@ -830,6 +855,7 @@
             drawMachine('PM1', pm1EndX, Y_UPPER, '#2563eb');
             drawMachine('PM5', a8EndX, cy - R, '#ea580c');
 
+            // วาดถุงวัตถุดิบ (Bags)
             bags.forEach(b => {
                 ctx.fillStyle = b.type === 'PM1' ? '#60a5fa' : '#fb923c';
                 ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
@@ -869,6 +895,7 @@
                                 let angle = Math.PI + (arcRatio * Math.PI / 2); 
                                 xCenter = cx + R * Math.cos(angle);
                                 yCenter = cy + R * Math.sin(angle);
+                                // ปรับหมุนให้ไหลไปตามแนวสายพานโดยรักษาทรงถุง
                                 rotation = angle + (Math.PI / 2);
                             } else { 
                                 let dist8 = dist - (3.19 + 1.25);
